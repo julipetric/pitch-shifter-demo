@@ -57,6 +57,7 @@ CORS is enabled on the API for the hosted frontend. Cold starts and limited thro
 
 ## Getting started
 
+0. **Setup:** Install required tools using `docs/SETUP.md` (includes bootstrap scripts).
 1. **Backend:** From the API project folder, restore and run the ASP.NET Core app (see any `README` or solution in the repo). Ensure the streaming endpoint and CORS are configured as in `docs/ARCHITECTURE.md`.
 2. **Frontend:** From the Angular project folder, run `npm install` and `ng serve` (or your configured command). Point the app at the API base URL (env or config).
 3. Use the player to select a track, adjust pitch/tempo, and watch the waveform comparison.
