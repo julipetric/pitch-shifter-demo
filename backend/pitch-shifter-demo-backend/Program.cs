@@ -32,7 +32,7 @@ app.MapGet("/api/audio/stream", async (IAudioStreamService streamService, Cancel
     var result = await streamService.GetDefaultStreamAsync(cancellationToken);
     if (result is null)
         return Results.NotFound();
-    return Results.Stream(result.Stream, result.ContentType, enableRangeProcessing: false);
+    return Results.Stream(result.Stream, result.ContentType, enableRangeProcessing: true);
 })
     .WithName("GetAudioStream")
     .WithOpenApi(operation =>
