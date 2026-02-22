@@ -1,6 +1,6 @@
 # Frontend (Angular)
 
-This folder will host the Angular client for the pitch-shifter demo.
+This folder hosts the Angular client for the pitch-shifter demo (**pitch-shifter-demo-frontend**).
 
 ## Scope
 - Angular + TypeScript UI for playback, pitch/tempo controls, and track selection.
@@ -9,3 +9,4 @@ This folder will host the Angular client for the pitch-shifter demo.
 
 ## Notes
 - The API base URL will be configured once the backend is scaffolded.
+- See [Deploying to Azure](../docs/azure-frontend-deploy.md) for deployment steps.
