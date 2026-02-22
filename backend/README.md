@@ -1,6 +1,7 @@
 # Backend (ASP.NET Core)
 
-This folder will host the ASP.NET Core Minimal API that streams audio and applies pitch/tempo processing.
+This folder hosts the ASP.NET Core Minimal API that streams audio and applies pitch/tempo processing.
+The backend project lives at `backend/pitch-shifter-demo-backend`.
 
 ## Scope
 - Minimal API endpoints for chunked audio streaming.
@@ -9,4 +10,6 @@ This folder will host the ASP.NET Core Minimal API that streams audio and applie
 
 ## Notes
 - Keep the API stateless per request to support simple scaling.
-- Endpoint shapes and configuration will be defined when the API project is scaffolded.
+
+## Azure Deployment
+- See `docs/AZURE-BACKEND-DEPLOY.md` for Azure App Service deployment steps and configuration guidance.
