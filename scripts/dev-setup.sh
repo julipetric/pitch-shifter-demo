@@ -73,6 +73,17 @@ install_pkg() {
   esac
 }
 
+# Run a command with optional timeout (seconds) to avoid hanging. Uses timeout(1) if available.
+run_with_timeout() {
+  want_timeout="${1:-5}"
+  shift
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "$want_timeout" "$@" 2>/dev/null
+  else
+    "$@" 2>/dev/null
+  fi
+}
+
 check_with_version() {
   label="$1"
   cmd="$2"
@@ -81,7 +92,7 @@ check_with_version() {
     if [ "$CHECK_ONLY" = true ]; then
       print_ok "${label}"
     else
-      version="$($cmd $args 2>/dev/null | head -n 1)"
+      version="$(run_with_timeout 5 $cmd $args 2>/dev/null | head -n 1)"
       if [ -n "$version" ]; then
         print_ok "${label} (${version})"
       else
@@ -125,7 +136,7 @@ if command_exists ng; then
   if [ "$CHECK_ONLY" = true ]; then
     print_ok "Angular CLI"
   else
-    ng_ver="$(ng version 2>/dev/null | head -n 1)"
+    ng_ver="$(run_with_timeout 5 ng version 2>/dev/null | head -n 1)"
     if [ -n "$ng_ver" ]; then
       print_ok "Angular CLI (${ng_ver})"
     else

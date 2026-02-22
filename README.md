@@ -52,7 +52,7 @@ CORS is enabled on the API for the hosted frontend. Cold starts and limited thro
 
 ## Project structure
 
-- `docs/` — Architecture (`ARCHITECTURE.md`), stack (`STACK.md`), and other design notes.
+- `docs/` — Architecture (`ARCHITECTURE.md`), stack (`STACK.md`), and other design notes. To deploy the frontend to Azure, see [Deploy frontend to Azure](docs/azure-frontend-deploy.md).
 - Frontend and backend source live in their respective directories (e.g. `src/` or `client/` and `api/` or `server/`, depending on your layout).
 
 ## Getting started

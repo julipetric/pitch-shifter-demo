@@ -1,0 +1,18 @@
+main {
+  padding: 2rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: calc(100vh - 64px);
+}
+mat-card {
+  max-width: 24rem;
+}
+h1 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.5rem;
+}
+p {
+  margin: 0;
+  color: rgba(0, 0, 0, 0.7);
+}

@@ -16,17 +16,30 @@ function Test-Command {
 function Invoke-Verify {
   param(
     [string]$Command,
-    [string[]]$Args
+    [string[]]$Args,
+    [int]$TimeoutSeconds = 5
   )
   if ($CheckOnly) {
     return $null
   }
   try {
-    $output = & $Command @Args 2>$null
-    if ($output) {
-      return ($output | Select-Object -First 1)
+    $job = Start-Job -ScriptBlock {
+      param($Cmd, $CmdArgs)
+      & $Cmd @CmdArgs 2>$null
+    } -ArgumentList $Command, (,$Args)
+    $completed = Wait-Job $job -Timeout $TimeoutSeconds
+    if ($completed) {
+      $output = Receive-Job $job
+      Remove-Job $job -Force
+      if ($output) {
+        return ($output | Select-Object -First 1)
+      }
+    } else {
+      Stop-Job $job -ErrorAction SilentlyContinue
+      Remove-Job $job -Force
     }
   } catch {
+    if ($job) { Remove-Job $job -Force -ErrorAction SilentlyContinue }
     return $null
   }
   return $null
