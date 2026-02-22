@@ -17,4 +17,9 @@ public class AudioOptions
     /// Optional default filename to stream when no sample is specified (e.g. "demo.mp3").
     /// </summary>
     public string? DefaultFileName { get; set; }
+
+    /// <summary>
+    /// When true, generate a short fallback tone if no sample file is available.
+    /// </summary>
+    public bool EnableFallbackTone { get; set; } = true;
 }

@@ -20,6 +20,10 @@ From the repo root:
 dotnet publish backend/pitch-shifter-demo-backend -c Release -o publish
 ```
 
+Before publishing, ensure a demo audio file exists in `backend/pitch-shifter-demo-backend/Content/Samples`.
+If you use a different location or filename, set `Audio__SamplesPath` and optional
+`Audio__DefaultFileName` in App Settings (see step 4).
+
 ## 2) Create Azure resources (CLI)
 
 Use existing resources if you already have them.
@@ -62,6 +66,7 @@ az webapp config appsettings set --resource-group <resource-group> --name <app-n
 Configuration notes:
 - App Service manages the listening port; do not hardcode a port in the app.
 - Additional settings can be added here as the backend grows (e.g., storage, auth).
+- Audio streaming defaults to `Content/Samples`; to target a specific file, set `Audio__SamplesPath=Content/Samples` and `Audio__DefaultFileName=<your-file.ext>`.
 
 ## 5) Validate the deployment
 
