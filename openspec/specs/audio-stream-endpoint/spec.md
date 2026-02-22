@@ -39,3 +39,10 @@ The backend MUST use NAudio (or equivalent per stack) for reading/decoding the s
 #### Scenario: Audio is decoded for streaming
 - **WHEN** the streaming service produces a stream from a supported audio file
 - **THEN** the file is read/decoded using the NAudio pipeline (or stack-defined equivalent) and the response is chunked for delivery
+
+### Requirement: Audio stream supports range requests
+The audio stream endpoint SHALL support HTTP byte range requests for seeking.
+
+#### Scenario: Range request returns partial content
+- **WHEN** a client requests `/api/audio/stream` with a valid `Range` header
+- **THEN** the response is `206 Partial Content` with an appropriate `Content-Range` header and audio bytes for that range

@@ -2,11 +2,51 @@
   <span>{{ title }}</span>
 </mat-toolbar>
 <main>
-  <mat-card>
+  <mat-card class="transport-card">
+    <mat-card-header>
+      <mat-card-title>Audio Transport</mat-card-title>
+      <mat-card-subtitle>Streaming from backend</mat-card-subtitle>
+    </mat-card-header>
     <mat-card-content>
-      <h1>Hello world</h1>
-      <p>Pitch Shifter Demo – Angular + Material</p>
+      <div class="controls">
+        <button mat-raised-button color="primary" (click)="togglePlay()">
+          {{ isPlaying ? 'Pause' : 'Play' }}
+        </button>
+      </div>
+
+      <div class="slider-group">
+        <label class="slider-label" for="seek-slider">Seek</label>
+        <mat-slider [min]="0" [max]="duration" [step]="0.1" [disabled]="duration === 0">
+          <input
+            matSliderThumb
+            id="seek-slider"
+            [value]="seekValue"
+            (input)="onSeekInput($event)"
+            (change)="onSeekCommit($event)"
+          />
+        </mat-slider>
+        <div class="time">
+          {{ formatTime(currentTime) }} / {{ formatTime(duration) }}
+        </div>
+      </div>
+
+      <div class="slider-group">
+        <label class="slider-label" for="volume-slider">Volume</label>
+        <mat-slider [min]="0" [max]="1" [step]="0.01">
+          <input matSliderThumb id="volume-slider" [value]="volume" (input)="onVolumeInput($event)" />
+        </mat-slider>
+      </div>
     </mat-card-content>
   </mat-card>
+
+  <audio
+    #audioRef
+    [src]="streamUrl"
+    preload="metadata"
+    (play)="onPlay()"
+    (pause)="onPause()"
+    (ended)="onEnded()"
+    (timeupdate)="onTimeUpdate()"
+    (loadedmetadata)="onLoadedMetadata()"
+  ></audio>
 </main>
-<router-outlet />
