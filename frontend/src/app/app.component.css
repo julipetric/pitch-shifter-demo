@@ -2,17 +2,41 @@ main {
   padding: 2rem;
   display: flex;
   justify-content: center;
-  align-items: center;
+  align-items: flex-start;
   min-height: calc(100vh - 64px);
 }
-mat-card {
-  max-width: 24rem;
+
+.transport-card {
+  width: min(640px, 92vw);
 }
-h1 {
-  margin: 0 0 0.5rem 0;
-  font-size: 1.5rem;
+
+.controls {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  margin-bottom: 1.5rem;
 }
-p {
-  margin: 0;
+
+.slider-group {
+  margin-bottom: 1.5rem;
+}
+
+.slider-label {
+  display: block;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+
+mat-slider {
+  width: 100%;
+}
+
+.time {
+  margin-top: 0.25rem;
+  font-size: 0.9rem;
   color: rgba(0, 0, 0, 0.7);
+}
+
+audio {
+  display: none;
 }
