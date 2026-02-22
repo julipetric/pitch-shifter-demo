@@ -12,7 +12,8 @@ builder.Services.AddSwaggerGen();
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+// TODO: Remove this once we have a proper development environment. Enables Swagger UI for development.
+if (true || app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
