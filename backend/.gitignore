@@ -1,0 +1,5 @@
+# Build output and distributables
+**/bin/
+**/obj/
+**/publish/
+publish.zip

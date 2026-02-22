@@ -1,1 +1,5 @@
 /docs/starting-points
+
+# Root-level publish output (e.g. from deploy scripts)
+publish/
+publish.zip
