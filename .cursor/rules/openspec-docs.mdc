@@ -1,0 +1,10 @@
+---
+description: Always consult OpenSpec docs and artifacts
+alwaysApply: true
+---
+
+# OpenSpec documentation awareness
+
+- When working on OpenSpec (opsx) changes or using OpenSpec skills/commands, always read and consider the documentation files provided or referenced by the change (proposal/specs/notes/etc.) and any docs explicitly given by the user, by default being: ARCHITECTURE.md, STACK.md, INTIAL_REQ.md, and SHOWCASE.md
+- Treat those docs as the source of truth for requirements; if they conflict, call it out and follow the most recent change artifact unless instructed otherwise.
+- Do not implement or answer OpenSpec work without checking the relevant docs first.
