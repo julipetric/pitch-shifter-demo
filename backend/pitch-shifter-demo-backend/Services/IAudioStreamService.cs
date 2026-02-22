@@ -9,7 +9,7 @@ public interface IAudioStreamService
     /// Gets a stream for the default sample and its content type.
     /// </summary>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>A result with stream and content type, or null if the sample is missing or invalid.</returns>
+    /// <returns>A result with stream and content type, or null if the sample is missing or invalid and fallback is disabled.</returns>
     Task<AudioStreamResult?> GetDefaultStreamAsync(CancellationToken cancellationToken = default);
 }
 

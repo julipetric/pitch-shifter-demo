@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Text;
 using Microsoft.Extensions.Options;
 using NAudio.Wave;
 using pitch_shifter_demo_backend.Options;
@@ -42,7 +43,7 @@ public class AudioStreamService : IAudioStreamService
         if (string.IsNullOrEmpty(fullPath))
         {
             _logger.LogWarning("Audio sample path is not configured or resolved to nothing");
-            return Task.FromResult<AudioStreamResult?>(null);
+            return Task.FromResult(CreateFallbackTone("sample path is not configured"));
         }
 
         var path = Path.IsPathRooted(fullPath)
@@ -62,7 +63,7 @@ public class AudioStreamService : IAudioStreamService
                 if (first is null)
                 {
                     _logger.LogWarning("No supported audio file found in {Path}", path);
-                    return Task.FromResult<AudioStreamResult?>(null);
+                    return Task.FromResult(CreateFallbackTone($"no supported audio file found in {path}"));
                 }
                 path = first;
             }
@@ -71,7 +72,7 @@ public class AudioStreamService : IAudioStreamService
         if (!File.Exists(path))
         {
             _logger.LogWarning("Audio sample file not found: {Path}", path);
-            return Task.FromResult<AudioStreamResult?>(null);
+            return Task.FromResult(CreateFallbackTone($"audio sample file not found: {path}"));
         }
 
         var contentType = GetContentType(path);
@@ -89,7 +90,7 @@ public class AudioStreamService : IAudioStreamService
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to open audio file with NAudio: {Path}", path);
-            return Task.FromResult<AudioStreamResult?>(null);
+            return Task.FromResult(CreateFallbackTone($"NAudio validation failed for {path}"));
         }
     }
 
@@ -104,5 +105,65 @@ public class AudioStreamService : IAudioStreamService
     {
         var ext = Path.GetExtension(filePath);
         return ContentTypeByExtension.TryGetValue(ext, out var contentType) ? contentType : "application/octet-stream";
+    }
+
+    private AudioStreamResult? CreateFallbackTone(string reason)
+    {
+        if (!_options.EnableFallbackTone)
+            return null;
+
+        try
+        {
+            _logger.LogWarning("Falling back to generated tone because {Reason}", reason);
+            var stream = BuildSineWaveStream();
+            return new AudioStreamResult(stream, "audio/wav");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to generate fallback audio tone");
+            return null;
+        }
+    }
+
+    private static MemoryStream BuildSineWaveStream()
+    {
+        const int sampleRate = 44100;
+        const int seconds = 5;
+        const int channels = 1;
+        const short bitsPerSample = 16;
+        const double frequency = 440.0;
+        const double amplitude = 0.25;
+
+        var totalSamples = sampleRate * seconds;
+        var bytesPerSample = bitsPerSample / 8;
+        var dataSize = totalSamples * channels * bytesPerSample;
+        var stream = new MemoryStream(44 + dataSize);
+
+        using (var writer = new BinaryWriter(stream, Encoding.ASCII, leaveOpen: true))
+        {
+            writer.Write(Encoding.ASCII.GetBytes("RIFF"));
+            writer.Write(36 + dataSize);
+            writer.Write(Encoding.ASCII.GetBytes("WAVE"));
+            writer.Write(Encoding.ASCII.GetBytes("fmt "));
+            writer.Write(16);
+            writer.Write((short)1);
+            writer.Write((short)channels);
+            writer.Write(sampleRate);
+            writer.Write(sampleRate * channels * bytesPerSample);
+            writer.Write((short)(channels * bytesPerSample));
+            writer.Write(bitsPerSample);
+            writer.Write(Encoding.ASCII.GetBytes("data"));
+            writer.Write(dataSize);
+
+            for (var n = 0; n < totalSamples; n++)
+            {
+                var sample = (short)(Math.Sin((2 * Math.PI * frequency * n) / sampleRate)
+                                     * short.MaxValue * amplitude);
+                writer.Write(sample);
+            }
+        }
+
+        stream.Position = 0;
+        return stream;
     }
 }
