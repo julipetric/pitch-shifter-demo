@@ -72,3 +72,11 @@ https://<app-name>.azurewebsites.net/health
 ```
 
 You should receive HTTP 200 with a JSON status body (for example `{"status":"ok"}`).
+
+**Swagger UI** is enabled by default when deployed, so you can open:
+
+```
+https://<app-name>.azurewebsites.net/swagger
+```
+
+to see and try the `/api/audio/stream` endpoint. To disable Swagger in production, set app setting `Swagger__Enabled` to `false` (e.g. `az webapp config appsettings set ... --settings Swagger__Enabled=false`).

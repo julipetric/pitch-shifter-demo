@@ -12,8 +12,10 @@ builder.Services.AddSwaggerGen();
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
-// TODO: Remove this once we have a proper development environment. Enables Swagger UI for development.
-if (app.Environment.IsDevelopment())
+// Swagger is enabled in all environments so /api/audio/stream is visible when deployed (e.g. Azure).
+// Set "Swagger": { "Enabled": false } in appsettings or Azure App Settings to hide in production.
+var swaggerEnabled = builder.Configuration.GetValue<bool>("Swagger:Enabled", true);
+if (swaggerEnabled)
 {
     app.UseSwagger();
     app.UseSwaggerUI();
