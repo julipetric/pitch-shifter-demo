@@ -29,3 +29,45 @@ The frontend SHALL request an updated stream when tempo, preserve-pitch, or pitc
 #### Scenario: Tempo change updates stream
 - **WHEN** the user changes the tempo slider value
 - **THEN** the client requests the stream URL with the updated `tempoPercent` value
+
+### Requirement: Control changes are debounced
+The frontend SHALL debounce control updates to avoid flooding the backend with rapid requests.
+
+#### Scenario: Debounced control updates
+- **WHEN** the user rapidly adjusts tempo or pitch controls
+- **THEN** the client waits briefly before requesting the updated stream
+
+### Requirement: Pitch changes apply on release
+Pitch changes SHALL only update the stream when the user releases the slider.
+
+#### Scenario: Pitch change committed on release
+- **WHEN** the user releases the pitch slider after dragging
+- **THEN** the client requests a new stream with the updated `pitchSemitones` value
+
+### Requirement: Preserve-pitch off forces neutral pitch
+When preserve-pitch is disabled, the client SHALL behave as if pitch is zero.
+
+#### Scenario: Preserve-pitch disabled
+- **WHEN** the user turns off preserve-pitch
+- **THEN** the client sends `pitchSemitones=0` and displays pitch at 0
+
+### Requirement: Seek uses processed timeline when needed
+When processing is active, seeking SHALL request a new stream using `startSeconds` on the processed timeline.
+
+#### Scenario: Seek with processing enabled
+- **WHEN** the user seeks while tempo or pitch processing is active
+- **THEN** the client requests `/api/audio/stream` with `startSeconds` set to the seek position
+
+### Requirement: Duration reflects tempo
+The frontend SHALL display duration and progress using the source duration adjusted by tempo (`processed = source / (tempoPercent/100)`).
+
+#### Scenario: Tempo changes update duration
+- **WHEN** the user changes tempo
+- **THEN** the displayed duration and progress scale to match the tempo-adjusted length
+
+### Requirement: Metadata endpoint provides source duration
+The frontend SHALL query `/api/audio/metadata` to obtain source duration used for tempo-adjusted display.
+
+#### Scenario: Metadata refresh
+- **WHEN** the frontend initializes or processing parameters change
+- **THEN** the client requests metadata and updates the displayed duration

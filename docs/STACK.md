@@ -11,7 +11,7 @@
 ### Frontend (Angular)
 - **Angular + TypeScript**: component-based UI and strong typing.
 - **Angular Material**: component library for UI (buttons, sliders, cards, etc.).
-- **RxJS**: input streams for pitch/tempo sliders with `debounceTime` or `throttleTime`.
+- **RxJS**: input streams for pitch/tempo sliders with `debounceTime` (implemented) or `throttleTime`.
 - **Web Audio API**: `AudioContext`, `AnalyserNode` for waveform/frequency analysis.
 - **Canvas 2D**: efficient waveform rendering.
 - **Performance patterns**: `ChangeDetectionStrategy.OnPush`, `trackBy` in lists, `async` pipe.
@@ -21,6 +21,7 @@
 - **NAudio**: audio file decoding and sample pipeline.
 - **Custom processing layer**: `IAudioProcessor` abstraction and an `ISampleProvider`-style implementation for pitch/tempo changes.
 - **Async I/O**: `async/await` streaming to avoid thread starvation.
+ - **Processed output**: MP3 streaming for reduced payload size; range disabled for processed streams.
 
 ## Supporting tech
 - **Logging**: built-in `ILogger` (optional Serilog later).
@@ -46,5 +47,6 @@
 - **Pitch/tempo control**: .NET processing layer using NAudio + custom logic.
 - **Waveform analyzer**: Web Audio API `AnalyserNode` + Canvas in Angular.
 - **Performance**: OnPush, RxJS throttle/debounce, async streaming.
+- **Metadata**: `/api/audio/metadata` provides source/processed durations for tempo-aware UI.
 - **SOLID/DIP**: `IAudioProcessor` and `IAudioSource` interfaces.
 - **Networking awareness**: chunked HTTP streaming now; UDP/RTP discussion for future improvements.

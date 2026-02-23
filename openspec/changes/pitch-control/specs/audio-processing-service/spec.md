@@ -38,3 +38,17 @@ The initial processing implementation MUST use a well-known time-stretch and pit
 #### Scenario: Library processor used
 - **WHEN** processing is applied during a stream
 - **THEN** the library-backed processor performs the time and pitch transformation
+
+### Requirement: Processed audio is streamed incrementally
+The processing service MUST stream processed audio without buffering the full file before emitting output.
+
+#### Scenario: Streaming output is incremental
+- **WHEN** processing is applied to a stream
+- **THEN** processed audio bytes are emitted before the full source file is consumed
+
+### Requirement: Processed output is compressed
+The processing service MUST emit processed audio in a compressed format to reduce transfer size.
+
+#### Scenario: Processed output is MP3
+- **WHEN** processing is enabled
+- **THEN** the processed stream uses the `audio/mpeg` content type

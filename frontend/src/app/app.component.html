@@ -36,6 +36,32 @@
           <input matSliderThumb id="volume-slider" [value]="volume" (input)="onVolumeInput($event)" />
         </mat-slider>
       </div>
+
+      <div class="slider-group">
+        <label class="slider-label" for="tempo-slider">Tempo ({{ tempoPercent }}%)</label>
+        <mat-slider [min]="tempoMin" [max]="tempoMax" [step]="1">
+          <input matSliderThumb id="tempo-slider" [value]="tempoPercent" (input)="onTempoInput($event)" />
+        </mat-slider>
+      </div>
+
+      <div class="toggle-group">
+        <mat-slide-toggle [checked]="preservePitch" (change)="onPreservePitchChange($event)">
+          Preserve pitch
+        </mat-slide-toggle>
+      </div>
+
+      <div class="slider-group">
+        <label class="slider-label" for="pitch-slider">Pitch ({{ pitchSemitones }} st)</label>
+        <mat-slider [min]="pitchMin" [max]="pitchMax" [step]="pitchStep">
+          <input
+            matSliderThumb
+            id="pitch-slider"
+            [value]="pitchSemitones"
+            (input)="onPitchInput($event)"
+            (change)="onPitchCommit($event)"
+          />
+        </mat-slider>
+      </div>
     </mat-card-content>
   </mat-card>
 
@@ -48,5 +74,6 @@
     (ended)="onEnded()"
     (timeupdate)="onTimeUpdate()"
     (loadedmetadata)="onLoadedMetadata()"
+    (canplay)="onCanPlay()"
   ></audio>
 </main>
