@@ -61,3 +61,19 @@ Waveform display components SHALL use Angular ChangeDetectionStrategy.OnPush to 
 #### Scenario: OnPush configured
 - **WHEN** the waveform component class is inspected
 - **THEN** its change detection strategy is set to OnPush
+
+## Technical Considerations
+
+### Waveform alignment and start offsets
+- The processed stream `startSeconds` is on the processed timeline; the original waveform SHOULD translate that start to source time so both waveforms show the same segment after re-processing or seeking.
+- When re-triggering processing shifts the processed stream start, the original waveform SHOULD be reloaded from the matching source start so the two waveforms remain aligned.
+- Pitch-only updates SHOULD NOT reload the original waveform when the start position has not changed.
+
+### Normalization and visibility
+- Normalize waveform heights using the global peak across the decoded buffer so the highest peak occupies 100% of the waveform height.
+- The normalization scan SHOULD be chunked/yielded to avoid blocking the main thread on large buffers.
+
+### Performance and responsiveness
+- Frequency coloring SHOULD be computed in chunks with periodic yields, and the canvas SHOULD re-render per chunk to avoid the “all at once” feeling.
+- In-flight frequency computations SHOULD be cancelable when the stream URL changes.
+- The processed waveform MAY defer coloring briefly so the base waveform renders quickly, then color in asynchronously.
