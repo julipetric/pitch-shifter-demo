@@ -21,6 +21,10 @@ main {
   margin-bottom: 1.5rem;
 }
 
+.toggle-group {
+  margin-bottom: 1.5rem;
+}
+
 .slider-label {
   display: block;
   font-weight: 500;

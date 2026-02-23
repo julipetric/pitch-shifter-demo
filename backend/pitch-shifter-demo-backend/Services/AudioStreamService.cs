@@ -12,6 +12,7 @@ namespace pitch_shifter_demo_backend.Services;
 /// </summary>
 public class AudioStreamService : IAudioStreamService
 {
+    private const double FallbackToneSeconds = 5.0;
     private static readonly ConcurrentDictionary<string, string> ContentTypeByExtension = new(StringComparer.OrdinalIgnoreCase)
     {
         [".mp3"] = "audio/mpeg",
@@ -25,72 +26,91 @@ public class AudioStreamService : IAudioStreamService
     private readonly AudioOptions _options;
     private readonly IWebHostEnvironment _environment;
     private readonly ILogger<AudioStreamService> _logger;
+    private readonly IAudioProcessor _audioProcessor;
 
     public AudioStreamService(
         IOptions<AudioOptions> options,
         IWebHostEnvironment environment,
-        ILogger<AudioStreamService> logger)
+        ILogger<AudioStreamService> logger,
+        IAudioProcessor audioProcessor)
     {
         _options = options.Value;
         _environment = environment;
         _logger = logger;
+        _audioProcessor = audioProcessor;
     }
 
     /// <inheritdoc />
     public Task<AudioStreamResult?> GetDefaultStreamAsync(CancellationToken cancellationToken = default)
     {
-        var fullPath = ResolveSamplePath();
-        if (string.IsNullOrEmpty(fullPath))
+        return GetDefaultStreamAsync(AudioProcessingParameters.Default, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public Task<AudioStreamResult?> GetDefaultStreamAsync(AudioProcessingParameters parameters, CancellationToken cancellationToken = default)
+    {
+        return GetDefaultStreamAsync(parameters, startSeconds: 0, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public Task<AudioStreamResult?> GetDefaultStreamAsync(
+        AudioProcessingParameters parameters,
+        double startSeconds,
+        CancellationToken cancellationToken = default)
+    {
+        if (!TryResolveSampleFilePath(out var path, out var reason))
         {
-            _logger.LogWarning("Audio sample path is not configured or resolved to nothing");
-            return Task.FromResult(CreateFallbackTone("sample path is not configured"));
+            _logger.LogWarning("Audio sample path could not be resolved: {Reason}", reason);
+            return Task.FromResult(CreateFallbackTone(reason));
         }
 
-        var path = Path.IsPathRooted(fullPath)
-            ? fullPath
-            : Path.Combine(_environment.ContentRootPath, fullPath);
-
-        var fileName = _options.DefaultFileName;
-        if (!string.IsNullOrEmpty(fileName))
-            path = Path.Combine(path, fileName);
-        else
-        {
-            // Single file in directory: use first supported file if no default name
-            if (!File.Exists(path) && Directory.Exists(path))
-            {
-                var first = Directory.EnumerateFiles(path)
-                    .FirstOrDefault(f => ContentTypeByExtension.ContainsKey(Path.GetExtension(f)));
-                if (first is null)
-                {
-                    _logger.LogWarning("No supported audio file found in {Path}", path);
-                    return Task.FromResult(CreateFallbackTone($"no supported audio file found in {path}"));
-                }
-                path = first;
-            }
-        }
-
-        if (!File.Exists(path))
-        {
-            _logger.LogWarning("Audio sample file not found: {Path}", path);
-            return Task.FromResult(CreateFallbackTone($"audio sample file not found: {path}"));
-        }
-
-        var contentType = GetContentType(path);
         try
         {
-            // Validate with NAudio, then stream file bytes (async-friendly FileStream)
-            using (var _ = new AudioFileReader(path))
-            {
-                // NAudio opened the file successfully; stream the same file for response
-            }
+            var result = parameters.IsDefault
+                ? TryBuildFileStream(path)
+                : TryBuildProcessedStream(path, parameters, startSeconds, cancellationToken);
 
-            var fileStream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 4096, useAsync: true);
-            return Task.FromResult<AudioStreamResult?>(new AudioStreamResult(fileStream, contentType));
+            return Task.FromResult(result ?? CreateFallbackTone("audio stream could not be generated"));
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to open audio file with NAudio: {Path}", path);
             return Task.FromResult(CreateFallbackTone($"NAudio validation failed for {path}"));
+        }
+    }
+
+    /// <inheritdoc />
+    public Task<AudioMetadata?> GetDefaultMetadataAsync(
+        AudioProcessingParameters parameters,
+        CancellationToken cancellationToken = default)
+    {
+        if (!TryResolveSampleFilePath(out var path, out var reason))
+        {
+            if (!_options.EnableFallbackTone)
+            {
+                _logger.LogWarning("Audio metadata unavailable: {Reason}", reason);
+                return Task.FromResult<AudioMetadata?>(null);
+            }
+
+            var processedDuration = FallbackToneSeconds / parameters.TempoRatio;
+            return Task.FromResult<AudioMetadata?>(new AudioMetadata(FallbackToneSeconds, processedDuration));
+        }
+
+        try
+        {
+            using var reader = new AudioFileReader(path);
+            var sourceDuration = reader.TotalTime.TotalSeconds;
+            var processedDuration = sourceDuration / parameters.TempoRatio;
+            return Task.FromResult<AudioMetadata?>(new AudioMetadata(sourceDuration, processedDuration));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to read audio metadata from {Path}", path);
+            if (!_options.EnableFallbackTone)
+                return Task.FromResult<AudioMetadata?>(null);
+
+            var processedDuration = FallbackToneSeconds / parameters.TempoRatio;
+            return Task.FromResult<AudioMetadata?>(new AudioMetadata(FallbackToneSeconds, processedDuration));
         }
     }
 
@@ -107,6 +127,102 @@ public class AudioStreamService : IAudioStreamService
         return ContentTypeByExtension.TryGetValue(ext, out var contentType) ? contentType : "application/octet-stream";
     }
 
+    private AudioStreamResult? TryBuildFileStream(string path)
+    {
+        var contentType = GetContentType(path);
+
+        if (!ValidateAudioFile(path, out var error))
+        {
+            _logger.LogWarning("NAudio validation failed for {Path}: {Error}", path, error);
+            return null;
+        }
+
+        var fileStream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 4096, useAsync: true);
+        return new AudioStreamResult(fileStream, contentType, EnableRangeProcessing: true);
+    }
+
+    private AudioStreamResult? TryBuildProcessedStream(
+        string path,
+        AudioProcessingParameters parameters,
+        double startSeconds,
+        CancellationToken cancellationToken)
+    {
+        AudioFileReader? reader = null;
+        try
+        {
+            reader = new AudioFileReader(path);
+            var sourceStartSeconds = Math.Max(0, startSeconds) * parameters.TempoRatio;
+            if (reader.TotalTime.TotalSeconds > 0 && sourceStartSeconds > reader.TotalTime.TotalSeconds)
+            {
+                sourceStartSeconds = reader.TotalTime.TotalSeconds;
+            }
+
+            reader.CurrentTime = TimeSpan.FromSeconds(sourceStartSeconds);
+            return _audioProcessor.Process(reader, parameters, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            reader?.Dispose();
+            _logger.LogWarning(ex, "Failed to process audio file, falling back to original stream: {Path}", path);
+            return TryBuildFileStream(path);
+        }
+    }
+
+    private static bool ValidateAudioFile(string path, out string? error)
+    {
+        try
+        {
+            using var _ = new AudioFileReader(path);
+            error = null;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            return false;
+        }
+    }
+
+    private bool TryResolveSampleFilePath(out string path, out string reason)
+    {
+        path = string.Empty;
+        reason = "sample path is not configured";
+
+        var fullPath = ResolveSamplePath();
+        if (string.IsNullOrEmpty(fullPath))
+            return false;
+
+        path = Path.IsPathRooted(fullPath)
+            ? fullPath
+            : Path.Combine(_environment.ContentRootPath, fullPath);
+
+        var fileName = _options.DefaultFileName;
+        if (!string.IsNullOrEmpty(fileName))
+        {
+            path = Path.Combine(path, fileName);
+        }
+        else if (!File.Exists(path) && Directory.Exists(path))
+        {
+            var first = Directory.EnumerateFiles(path)
+                .FirstOrDefault(f => ContentTypeByExtension.ContainsKey(Path.GetExtension(f)));
+            if (first is null)
+            {
+                reason = $"no supported audio file found in {path}";
+                return false;
+            }
+            path = first;
+        }
+
+        if (!File.Exists(path))
+        {
+            reason = $"audio sample file not found: {path}";
+            return false;
+        }
+
+        reason = string.Empty;
+        return true;
+    }
+
     private AudioStreamResult? CreateFallbackTone(string reason)
     {
         if (!_options.EnableFallbackTone)
@@ -116,7 +232,7 @@ public class AudioStreamService : IAudioStreamService
         {
             _logger.LogWarning("Falling back to generated tone because {Reason}", reason);
             var stream = BuildSineWaveStream();
-            return new AudioStreamResult(stream, "audio/wav");
+            return new AudioStreamResult(stream, "audio/wav", EnableRangeProcessing: true);
         }
         catch (Exception ex)
         {

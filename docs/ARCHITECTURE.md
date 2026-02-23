@@ -19,22 +19,23 @@ flowchart LR
 
 ## Core components
 ### Frontend (Angular)
-- **Player UI**: track selection, play/pause, pitch/tempo sliders.
-- **Waveform UI**: two canvases for original vs processed waveform.
-- **AudioGraphService**: builds the Web Audio API graph for analysis.
-- **AudioApiService**: calls `/api/stream` with pitch/tempo params.
+- **Player UI**: play/pause, seek, tempo/pitch sliders, preserve-pitch toggle.
+- **Waveform UI**: planned (not yet implemented).
+- **Audio API wiring**: builds `/api/audio/stream` URL with processing params and fetches `/api/audio/metadata` for duration.
 
 ### Backend (.NET)
 - **AudioStreamController**: HTTP streaming endpoint.
 - **AudioStreamService**: orchestrates file read, buffering, and streaming.
 - **IAudioProcessor**: abstraction for pitch/tempo processing.
 - **NAudio pipeline**: decode source audio into sample buffers.
+ - **Metadata endpoint**: `/api/audio/metadata` returns source/processed duration.
 
 ## Request and streaming flow
 ```mermaid
 flowchart TD
   Controls[PitchTempoControls]
   ApiCall[ApiStreamRequest]
+  MetaCall[AudioMetadataRequest]
   StreamCtl[AudioStreamController]
   StreamSvc[AudioStreamService]
   Decoder[NAudioDecode]
@@ -46,6 +47,7 @@ flowchart TD
 
   Controls --> ApiCall
   ApiCall --> StreamCtl
+  MetaCall --> StreamCtl
   StreamCtl --> StreamSvc
   StreamSvc --> Decoder
   Decoder --> Processor
@@ -57,12 +59,12 @@ flowchart TD
 
 ## Responsibilities and boundaries
 - **Frontend**: user interaction, visualization, and lightweight audio analysis.
-- **Backend**: heavy audio processing and streaming, stateless per request.
+- **Backend**: heavy audio processing and streaming, stateless per request. Processed streams use MP3 for size and do not support range.
 - **Processing layer**: isolated behind `IAudioProcessor` for easy swapping (simple stretch vs phase vocoder later). We will implement a library that does the processing first and the as a separate project the processing on our own.
 
 ## Non-functional considerations
 - **Latency**: chunked streaming, small buffers, async I/O.
-- **Performance**: Angular OnPush and throttled slider events.
+- **Performance**: throttled/debounced slider events (RxJS).
 - **Scalability**: stateless API, no in-memory session state.
 - **Reliability**: fallback to original audio stream if processing fails.
 

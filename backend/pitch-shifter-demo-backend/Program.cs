@@ -7,6 +7,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.Configure<AudioOptions>(builder.Configuration.GetSection(AudioOptions.SectionName));
 builder.Services.AddSingleton<IAudioStreamService, AudioStreamService>();
+builder.Services.AddSingleton<IAudioProcessor, SoundTouchAudioProcessor>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -28,18 +29,65 @@ app.MapGet("/health", () => Results.Ok(new { status = "ok" }))
     .WithName("Health")
     .WithOpenApi();
 
-app.MapGet("/api/audio/stream", async (IAudioStreamService streamService, CancellationToken cancellationToken) =>
+app.MapGet("/api/audio/stream", async (
+    double? tempoPercent,
+    bool? preservePitch,
+    double? pitchSemitones,
+    double? startSeconds,
+    IAudioStreamService streamService,
+    CancellationToken cancellationToken) =>
 {
-    var result = await streamService.GetDefaultStreamAsync(cancellationToken);
+    if (!AudioProcessingParameters.TryCreate(tempoPercent, preservePitch, pitchSemitones, out var parameters, out var error))
+    {
+        return Results.BadRequest(new { error });
+    }
+
+    var start = startSeconds ?? 0;
+    if (start < 0)
+    {
+        return Results.BadRequest(new { error = "startSeconds must be greater than or equal to 0." });
+    }
+
+    var result = await streamService.GetDefaultStreamAsync(parameters, start, cancellationToken);
     if (result is null)
         return Results.NotFound();
-    return Results.Stream(result.Stream, result.ContentType, enableRangeProcessing: true);
+    return Results.Stream(result.Stream, result.ContentType, enableRangeProcessing: result.EnableRangeProcessing);
 })
     .WithName("GetAudioStream")
     .WithOpenApi(operation =>
 {
     operation.Summary = "Stream default audio sample";
-    operation.Description = "Returns the default static audio sample as a chunked stream. Configure sample path and optional default file in Audio section of appsettings.";
+    operation.Description = "Returns the default static audio sample as a chunked stream. Optional query params: tempoPercent (50-125), preservePitch (true/false), pitchSemitones (-12 to 12 in 0.5 steps), startSeconds (offset on processed timeline). Configure sample path and optional default file in Audio section of appsettings.";
+    return operation;
+});
+
+app.MapGet("/api/audio/metadata", async (
+    double? tempoPercent,
+    bool? preservePitch,
+    double? pitchSemitones,
+    IAudioStreamService streamService,
+    CancellationToken cancellationToken) =>
+{
+    if (!AudioProcessingParameters.TryCreate(tempoPercent, preservePitch, pitchSemitones, out var parameters, out var error))
+    {
+        return Results.BadRequest(new { error });
+    }
+
+    var metadata = await streamService.GetDefaultMetadataAsync(parameters, cancellationToken);
+    if (metadata is null)
+        return Results.NotFound();
+
+    return Results.Ok(new
+    {
+        sourceDurationSeconds = metadata.SourceDurationSeconds,
+        processedDurationSeconds = metadata.ProcessedDurationSeconds
+    });
+})
+    .WithName("GetAudioMetadata")
+    .WithOpenApi(operation =>
+{
+    operation.Summary = "Get audio metadata for the default sample";
+    operation.Description = "Returns source and processed duration seconds for the default sample with optional processing parameters.";
     return operation;
 });
 
