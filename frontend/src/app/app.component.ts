@@ -9,11 +9,10 @@ import { debounceTime, distinctUntilChanged, takeUntil } from 'rxjs/operators';
 import { environment } from '../environments/environment';
 
 @Component({
-  selector: 'app-root',
-  standalone: true,
-  imports: [MatToolbarModule, MatCardModule, MatButtonModule, MatSliderModule, MatSlideToggleModule],
-  templateUrl: './app.component.html',
-  styleUrl: './app.component.css'
+    selector: 'app-root',
+    imports: [MatToolbarModule, MatCardModule, MatButtonModule, MatSliderModule, MatSlideToggleModule],
+    templateUrl: './app.component.html',
+    styleUrl: './app.component.css'
 })
 export class AppComponent implements AfterViewInit, OnInit, OnDestroy {
   @ViewChild('audioRef') audioRef?: ElementRef<HTMLAudioElement>;
