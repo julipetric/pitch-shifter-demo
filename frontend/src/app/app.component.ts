@@ -7,13 +7,20 @@ import { MatSlideToggleChange, MatSlideToggleModule } from '@angular/material/sl
 import { Subject } from 'rxjs';
 import { debounceTime, distinctUntilChanged, takeUntil } from 'rxjs/operators';
 import { environment } from '../environments/environment';
+import { WaveformSnippetComponent } from './waveform/waveform-snippet.component';
 
 @Component({
-  selector: 'app-root',
-  standalone: true,
-  imports: [MatToolbarModule, MatCardModule, MatButtonModule, MatSliderModule, MatSlideToggleModule],
-  templateUrl: './app.component.html',
-  styleUrl: './app.component.css'
+    selector: 'app-root',
+    imports: [
+      MatToolbarModule,
+      MatCardModule,
+      MatButtonModule,
+      MatSliderModule,
+      MatSlideToggleModule,
+      WaveformSnippetComponent,
+    ],
+    templateUrl: './app.component.html',
+    styleUrl: './app.component.css'
 })
 export class AppComponent implements AfterViewInit, OnInit, OnDestroy {
   @ViewChild('audioRef') audioRef?: ElementRef<HTMLAudioElement>;
@@ -30,6 +37,13 @@ export class AppComponent implements AfterViewInit, OnInit, OnDestroy {
   readonly pitchStep = 0.5;
 
   streamUrl = this.buildStreamUrl(environment.audioApiBaseUrl);
+  /** Start position (in source seconds) for the original waveform; only updated on seek/tempo so pitch-only changes do not reload the original. */
+  private originalStreamStartSeconds = 0;
+  /** URL for original (unprocessed) stream. Uses originalStreamStartSeconds so changing pitch alone does not reprocess/reload the original. */
+  get originalStreamUrl(): string {
+    const startSeconds = this.isProcessingActive ? this.originalStreamStartSeconds : 0;
+    return this.buildOriginalStreamUrl(environment.audioApiBaseUrl, startSeconds);
+  }
   streamOffsetSeconds = 0;
   private readonly updateDelayMs = 300;
   private pendingAutoPlay = false;
@@ -100,11 +114,11 @@ export class AppComponent implements AfterViewInit, OnInit, OnDestroy {
   onLoadedMetadata(): void {
     const audio = this.audioRef?.nativeElement;
     if (!audio) return;
-    if (!this.isProcessingActive() && Number.isFinite(audio.duration) && audio.duration > 0) {
+    if (!this.isProcessingActive && Number.isFinite(audio.duration) && audio.duration > 0) {
       this.sourceDurationSeconds = audio.duration;
     }
     this.updateProcessedDuration();
-    if (this.pendingSeekSeconds !== null && !this.isProcessingActive()) {
+    if (this.pendingSeekSeconds !== null && !this.isProcessingActive) {
       audio.currentTime = this.pendingSeekSeconds;
       this.pendingSeekSeconds = null;
     }
@@ -144,7 +158,7 @@ export class AppComponent implements AfterViewInit, OnInit, OnDestroy {
     const value = this.readSliderValue(event);
     this.seekValue = value;
     this.currentTime = value;
-    if (this.isProcessingActive()) {
+    if (this.isProcessingActive) {
       this.isSeeking = false;
       this.scheduleStreamUpdate(value);
       return;
@@ -184,7 +198,7 @@ export class AppComponent implements AfterViewInit, OnInit, OnDestroy {
   onPitchCommit(event: Event): void {
     const value = this.normalizePitch(this.readSliderValue(event));
     this.pitchSemitones = value;
-    this.scheduleStreamUpdate(this.currentTime);
+    this.applyStreamUpdate(this.currentTime);
   }
 
   onPreservePitchChange(event: MatSlideToggleChange): void {
@@ -192,7 +206,7 @@ export class AppComponent implements AfterViewInit, OnInit, OnDestroy {
     if (!this.preservePitch) {
       this.pitchSemitones = 0;
     }
-    this.scheduleStreamUpdate(this.currentTime);
+    this.applyStreamUpdate(this.currentTime);
   }
 
   formatTime(totalSeconds: number): string {
@@ -216,7 +230,20 @@ export class AppComponent implements AfterViewInit, OnInit, OnDestroy {
     url.searchParams.set('preservePitch', `${this.preservePitch}`);
     const pitch = this.preservePitch ? this.pitchSemitones : 0;
     url.searchParams.set('pitchSemitones', `${pitch}`);
-    if (this.isProcessingActive() && startSeconds > 0) {
+    if (this.isProcessingActive && startSeconds > 0) {
+      url.searchParams.set('startSeconds', `${startSeconds}`);
+    }
+    return url.toString();
+  }
+
+  /** Build stream URL with default parameters (100% tempo, 0 pitch) for original waveform visualization. Optional startSeconds (in source time) aligns segment with processed stream when retriggering. */
+  private buildOriginalStreamUrl(baseUrl: string, startSeconds = 0): string {
+    const trimmed = baseUrl.replace(/\/$/, '');
+    const url = new URL(`${trimmed}/api/audio/stream`);
+    url.searchParams.set('tempoPercent', '100');
+    url.searchParams.set('preservePitch', 'true');
+    url.searchParams.set('pitchSemitones', '0');
+    if (startSeconds > 0) {
       url.searchParams.set('startSeconds', `${startSeconds}`);
     }
     return url.toString();
@@ -240,8 +267,12 @@ export class AppComponent implements AfterViewInit, OnInit, OnDestroy {
     const audio = this.audioRef?.nativeElement;
     const wasPlaying = this.isPlaying;
     const start = Math.max(0, startSeconds);
-    const processing = this.isProcessingActive();
+    const processing = this.isProcessingActive;
+    const startChanged = (processing ? start : 0) !== this.streamOffsetSeconds || (!processing && this.originalStreamStartSeconds !== 0);
     this.streamOffsetSeconds = processing ? start : 0;
+    if (startChanged) {
+      this.originalStreamStartSeconds = processing ? this.toSourceSeconds(start) : 0;
+    }
     this.pendingSeekSeconds = processing ? null : start;
     this.streamUrl = this.buildStreamUrl(environment.audioApiBaseUrl, processing ? start : 0);
     this.refreshMetadata();
@@ -280,8 +311,27 @@ export class AppComponent implements AfterViewInit, OnInit, OnDestroy {
       .catch(() => undefined);
   }
 
-  private isProcessingActive(): boolean {
+  /** True when tempo or pitch differ from default; used to show processed waveform and drive stream updates. */
+  get isProcessingActive(): boolean {
     return this.tempoPercent !== 100 || this.pitchSemitones !== 0;
+  }
+
+  /** Progress 0–1 for the original waveform (source timeline). */
+  get originalProgress(): number {
+    if (!Number.isFinite(this.sourceDurationSeconds) || this.sourceDurationSeconds <= 0) return 0;
+    const sourceTime = this.toSourceSeconds(this.currentTime);
+    return Math.max(0, Math.min(1, sourceTime / this.sourceDurationSeconds));
+  }
+
+  /** Progress 0–1 for the processed waveform (playback timeline). */
+  get processedProgress(): number {
+    if (!Number.isFinite(this.duration) || this.duration <= 0) return 0;
+    return Math.max(0, Math.min(1, this.currentTime / this.duration));
+  }
+
+  /** Source duration in seconds for waveform width (so original and processed lengths can match). */
+  get sourceDuration(): number {
+    return this.sourceDurationSeconds;
   }
 
   private toSourceSeconds(processedSeconds: number, tempoPercent = this.tempoPercent): number {
