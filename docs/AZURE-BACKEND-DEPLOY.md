@@ -66,7 +66,7 @@ az webapp config appsettings set --resource-group <resource-group> --name <app-n
 Configuration notes:
 - App Service manages the listening port; do not hardcode a port in the app.
 - Additional settings can be added here as the backend grows (e.g., storage, auth).
-- Audio streaming defaults to `Content/Samples`; to target a specific file, set `Audio__SamplesPath=Content/Samples` and `Audio__DefaultFileName=<your-file.ext>`.
+- Audio streaming defaults to `Content/Samples`; to target a specific file, set `Audio__SamplesPath=Content/Samples` and `Audio__DefaultFileName=<your-file.ext>`. Set `Audio__EnableFallbackTone=false` to disable the generated demo tone when no file is available.
 
 ## 5) Validate the deployment
 
