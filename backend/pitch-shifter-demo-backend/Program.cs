@@ -1,6 +1,18 @@
+using System.Reflection;
 using Microsoft.Extensions.Options;
 using pitch_shifter_demo_backend.Options;
 using pitch_shifter_demo_backend.Services;
+
+// Redirect NAudio 1.9.0 requests to NAudio.Core (some transitive deps may still reference old NAudio)
+AppDomain.CurrentDomain.AssemblyResolve += (_, args) =>
+{
+    var name = args.Name;
+    if (name.StartsWith("NAudio,", StringComparison.OrdinalIgnoreCase))
+    {
+        return Assembly.Load("NAudio.Core");
+    }
+    return null;
+};
 
 var builder = WebApplication.CreateBuilder(args);
 

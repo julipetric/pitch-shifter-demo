@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Text;
 using Microsoft.Extensions.Options;
 using NAudio.Wave;
+using NLayer.NAudioSupport;
 using pitch_shifter_demo_backend.Options;
 
 namespace pitch_shifter_demo_backend.Services;
@@ -98,7 +99,7 @@ public class AudioStreamService : IAudioStreamService
 
         try
         {
-            using var reader = new AudioFileReader(path);
+            using var reader = CreateAudioReader(path);
             var sourceDuration = reader.TotalTime.TotalSeconds;
             var processedDuration = sourceDuration / parameters.TempoRatio;
             return Task.FromResult<AudioMetadata?>(new AudioMetadata(sourceDuration, processedDuration));
@@ -127,6 +128,23 @@ public class AudioStreamService : IAudioStreamService
         return ContentTypeByExtension.TryGetValue(ext, out var contentType) ? contentType : "application/octet-stream";
     }
 
+    /// <summary>
+    /// Creates a WaveStream for the given path. Uses NLayer's managed MP3 decoder for .mp3 files
+    /// so playback works on Azure App Service (Windows Server lacks the ACM MP3 codec).
+    /// Uses NAudio.Core only to avoid NAudio/NAudio.Core assembly mismatch (TypeLoadException).
+    /// </summary>
+    private static WaveStream CreateAudioReader(string path)
+    {
+        var ext = Path.GetExtension(path);
+        if (string.Equals(ext, ".mp3", StringComparison.OrdinalIgnoreCase))
+        {
+            var builder = new Mp3FileReaderBase.FrameDecompressorBuilder(wf => new Mp3FrameDecompressor(wf));
+            return new Mp3FileReaderBase(path, builder);
+        }
+        // WAV and other formats: WaveFileReader (fails for .ogg/.m4a/.aac, triggering fallback)
+        return new WaveFileReader(path);
+    }
+
     private AudioStreamResult? TryBuildFileStream(string path)
     {
         var contentType = GetContentType(path);
@@ -147,10 +165,10 @@ public class AudioStreamService : IAudioStreamService
         double startSeconds,
         CancellationToken cancellationToken)
     {
-        AudioFileReader? reader = null;
+        WaveStream? reader = null;
         try
         {
-            reader = new AudioFileReader(path);
+            reader = CreateAudioReader(path);
             var sourceStartSeconds = Math.Max(0, startSeconds) * parameters.TempoRatio;
             if (reader.TotalTime.TotalSeconds > 0 && sourceStartSeconds > reader.TotalTime.TotalSeconds)
             {
@@ -172,7 +190,7 @@ public class AudioStreamService : IAudioStreamService
     {
         try
         {
-            using var _ = new AudioFileReader(path);
+            using var _ = CreateAudioReader(path);
             error = null;
             return true;
         }

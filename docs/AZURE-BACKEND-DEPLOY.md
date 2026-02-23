@@ -85,3 +85,8 @@ https://<app-name>.azurewebsites.net/swagger
 ```
 
 to see and try the `/api/audio/stream` endpoint. To disable Swagger in production, set app setting `Swagger__Enabled` to `false` (e.g. `az webapp config appsettings set ... --settings Swagger__Enabled=false`).
+
+## Troubleshooting
+
+- **Test tone instead of sample:** Windows App Service lacks the ACM MP3 codec. The backend uses NLayer's managed decoder; redeploy and check `/diagnostics/audio` if issues persist.
+- **NAudio assembly errors:** Redeploy after a clean build (`dotnet publish`). An `AssemblyResolve` handler redirects legacy NAudio references to NAudio.Core.
