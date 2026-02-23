@@ -65,6 +65,29 @@
     </mat-card-content>
   </mat-card>
 
+  <mat-card class="waveform-card">
+    <mat-card-header>
+      <mat-card-title>Waveform</mat-card-title>
+      <mat-card-subtitle>Original vs processed</mat-card-subtitle>
+    </mat-card-header>
+    <mat-card-content>
+      <div class="waveform-panel">
+        <div class="waveform-window">
+          <div class="waveform-label">Original</div>
+          <app-waveform-snippet [streamUrl]="originalStreamUrl" [progress]="originalProgress" />
+        </div>
+        <div class="waveform-window" [class.hidden]="!isProcessingActive">
+          <div class="waveform-label">Processed</div>
+          <app-waveform-snippet
+            [streamUrl]="isProcessingActive ? streamUrl : null"
+            [progress]="processedProgress"
+            [deferColoring]="true"
+          />
+        </div>
+      </div>
+    </mat-card-content>
+  </mat-card>
+
   <audio
     #audioRef
     [src]="streamUrl"

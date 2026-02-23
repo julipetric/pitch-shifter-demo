@@ -11,4 +11,4 @@ track frontend:
 4. npx @azure/static-web-apps-cli deploy dist/pitch-shifter-demo-frontend/browser --env production --app-name "pitch-shifter-demo-frontend" --resource-group "demo-apps"
 
 # All-in-one PowerShell oneliner:
-dotnet publish backend/pitch-shifter-demo-backend -c Release -o publish; Compress-Archive -Path publish\* -DestinationPath publish.zip -Force; az webapp deploy --resource-group demo-apps --name pitch-shifter-demo-backend --src-path publish.zip; cd frontend; npm ci; npm run build; npx @azure/static-web-apps-cli deploy dist/pitch-shifter-demo-frontend/browser --env production --app-name "pitch-shifter-demo-frontend" --resource-group "demo-apps"
+dotnet publish backend/pitch-shifter-demo-backend -c Release -o publish; Compress-Archive -Path publish\* -DestinationPath publish.zip -Force; az webapp deploy --resource-group demo-apps --name pitch-shifter-demo-backend --src-path publish.zip; cd frontend; npm i; npm ci; npm run build; npx @azure/static-web-apps-cli deploy dist/pitch-shifter-demo-frontend/browser --env production --app-name "pitch-shifter-demo-frontend" --resource-group "demo-apps"

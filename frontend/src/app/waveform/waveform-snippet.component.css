@@ -1,0 +1,17 @@
+:host {
+  display: block;
+  width: 100%;
+}
+
+.waveform-container {
+  display: block;
+  min-height: 120px;
+  height: 120px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  background: #0d0d0d;
+  border-radius: 4px;
+  overflow: hidden;
+  box-sizing: border-box;
+}

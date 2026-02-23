@@ -10,6 +10,15 @@ builder.Services.AddSingleton<IAudioStreamService, AudioStreamService>();
 builder.Services.AddSingleton<IAudioProcessor, SoundTouchAudioProcessor>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy.WithOrigins("http://localhost:4200")
+            .AllowAnyMethod()
+            .AllowAnyHeader();
+    });
+});
 
 var app = builder.Build();
 
@@ -23,6 +32,7 @@ if (swaggerEnabled)
     app.UseSwaggerUI();
 }
 
+app.UseCors();
 app.UseHttpsRedirection();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }))
