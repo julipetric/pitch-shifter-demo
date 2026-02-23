@@ -20,6 +20,6 @@
 
 ## 4. Verification & docs
 
-- [ ] 4.1 Smoke test: default stream, tempo change, preserve-pitch toggle, pitch shift
+- [x] 4.1 Smoke test: default stream, tempo change, preserve-pitch toggle, pitch shift
 - [x] 4.2 Update any API usage or demo notes to mention new parameters
 - [x] 4.3 Validate architecture/stack/docs align with implementation
