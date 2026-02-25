@@ -1,1 +1,15 @@
-<div class="waveform-container" #container></div>
+<div class="waveform-shell">
+  <div class="waveform-container" #container></div>
+
+  @if (isLoading) {
+    <div class="waveform-overlay">
+      <div class="spinner" aria-hidden="true"></div>
+      <div class="overlay-text">Loading…</div>
+    </div>
+  } @else if (isAnalyzing) {
+    <div class="waveform-overlay waveform-overlay--subtle">
+      <div class="spinner spinner--small" aria-hidden="true"></div>
+      <div class="overlay-text">Analyzing…</div>
+    </div>
+  }
+</div>

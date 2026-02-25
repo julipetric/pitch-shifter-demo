@@ -1,29 +1,36 @@
-import { Component, ElementRef, ViewChild, AfterViewInit, OnDestroy, OnInit } from '@angular/core';
+import { AsyncPipe } from '@angular/common';
+import { Component, ElementRef, ViewChild, AfterViewInit, OnDestroy, OnInit, inject } from '@angular/core';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatSliderModule } from '@angular/material/slider';
 import { MatSlideToggleChange, MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { Subject } from 'rxjs';
-import { debounceTime, distinctUntilChanged, takeUntil } from 'rxjs/operators';
-import { environment } from '../environments/environment';
+import { debounceTime, distinctUntilChanged, shareReplay, startWith, switchMap, takeUntil, tap } from 'rxjs/operators';
 import { WaveformSnippetComponent } from './waveform/waveform-snippet.component';
+import { AudioApiService, AudioProcessingParams } from './services/audio-api.service';
+import { FormatTimePipe } from './pipes/format-time.pipe';
 
 @Component({
     selector: 'app-root',
     imports: [
+      AsyncPipe,
       MatToolbarModule,
       MatCardModule,
       MatButtonModule,
       MatSliderModule,
       MatSlideToggleModule,
       WaveformSnippetComponent,
+      // eslint-disable-next-line @angular-eslint/no-unused-standalone-imports
+      FormatTimePipe,
     ],
     templateUrl: './app.component.html',
     styleUrl: './app.component.css'
 })
 export class AppComponent implements AfterViewInit, OnInit, OnDestroy {
   @ViewChild('audioRef') audioRef?: ElementRef<HTMLAudioElement>;
+
+  private readonly audioApi = inject(AudioApiService);
 
   title = 'Pitch Shifter Demo';
   tempoPercent = 100;
@@ -36,13 +43,13 @@ export class AppComponent implements AfterViewInit, OnInit, OnDestroy {
   readonly pitchMax = 12;
   readonly pitchStep = 0.5;
 
-  streamUrl = this.buildStreamUrl(environment.audioApiBaseUrl);
+  streamUrl = this.audioApi.buildStreamUrl(this.currentProcessingParams());
   /** Start position (in source seconds) for the original waveform; only updated on seek/tempo so pitch-only changes do not reload the original. */
   private originalStreamStartSeconds = 0;
   /** URL for original (unprocessed) stream. Uses originalStreamStartSeconds so changing pitch alone does not reprocess/reload the original. */
   get originalStreamUrl(): string {
     const startSeconds = this.isProcessingActive ? this.originalStreamStartSeconds : 0;
-    return this.buildOriginalStreamUrl(environment.audioApiBaseUrl, startSeconds);
+    return this.audioApi.buildOriginalStreamUrl(startSeconds);
   }
   streamOffsetSeconds = 0;
   private readonly updateDelayMs = 300;
@@ -50,7 +57,23 @@ export class AppComponent implements AfterViewInit, OnInit, OnDestroy {
   private pendingSeekSeconds: number | null = null;
   private sourceDurationSeconds = 0;
   private readonly controlChange$ = new Subject<number>();
+  private readonly metadataRefresh$ = new Subject<void>();
   private readonly destroy$ = new Subject<void>();
+
+  readonly metadata$ = this.metadataRefresh$.pipe(
+    startWith(void 0),
+    switchMap(() => {
+      return this.audioApi.getMetadata$(this.currentProcessingParams());
+    }),
+    tap((data) => {
+      if (!data) return;
+      if (Number.isFinite(data.sourceDurationSeconds) && data.sourceDurationSeconds > 0) {
+        this.sourceDurationSeconds = data.sourceDurationSeconds;
+        this.updateProcessedDuration();
+      }
+    }),
+    shareReplay({ bufferSize: 1, refCount: true })
+  );
 
   isPlaying = false;
   currentTime = 0;
@@ -209,54 +232,11 @@ export class AppComponent implements AfterViewInit, OnInit, OnDestroy {
     this.applyStreamUpdate(this.currentTime);
   }
 
-  formatTime(totalSeconds: number): string {
-    if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) return '0:00';
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = Math.floor(totalSeconds % 60);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  }
-
   private readSliderValue(event: Event): number {
     const input = event.target as HTMLInputElement | null;
     if (!input) return 0;
     const value = Number.isFinite(input.valueAsNumber) ? input.valueAsNumber : Number(input.value);
     return Number.isFinite(value) ? value : 0;
-  }
-
-  private buildStreamUrl(baseUrl: string, startSeconds = 0): string {
-    const trimmed = baseUrl.replace(/\/$/, '');
-    const url = new URL(`${trimmed}/api/audio/stream`);
-    url.searchParams.set('tempoPercent', `${this.tempoPercent}`);
-    url.searchParams.set('preservePitch', `${this.preservePitch}`);
-    const pitch = this.preservePitch ? this.pitchSemitones : 0;
-    url.searchParams.set('pitchSemitones', `${pitch}`);
-    if (this.isProcessingActive && startSeconds > 0) {
-      url.searchParams.set('startSeconds', `${startSeconds}`);
-    }
-    return url.toString();
-  }
-
-  /** Build stream URL with default parameters (100% tempo, 0 pitch) for original waveform visualization. Optional startSeconds (in source time) aligns segment with processed stream when retriggering. */
-  private buildOriginalStreamUrl(baseUrl: string, startSeconds = 0): string {
-    const trimmed = baseUrl.replace(/\/$/, '');
-    const url = new URL(`${trimmed}/api/audio/stream`);
-    url.searchParams.set('tempoPercent', '100');
-    url.searchParams.set('preservePitch', 'true');
-    url.searchParams.set('pitchSemitones', '0');
-    if (startSeconds > 0) {
-      url.searchParams.set('startSeconds', `${startSeconds}`);
-    }
-    return url.toString();
-  }
-
-  private buildMetadataUrl(baseUrl: string): string {
-    const trimmed = baseUrl.replace(/\/$/, '');
-    const url = new URL(`${trimmed}/api/audio/metadata`);
-    url.searchParams.set('tempoPercent', `${this.tempoPercent}`);
-    url.searchParams.set('preservePitch', `${this.preservePitch}`);
-    const pitch = this.preservePitch ? this.pitchSemitones : 0;
-    url.searchParams.set('pitchSemitones', `${pitch}`);
-    return url.toString();
   }
 
   private scheduleStreamUpdate(startSeconds = 0): void {
@@ -274,7 +254,7 @@ export class AppComponent implements AfterViewInit, OnInit, OnDestroy {
       this.originalStreamStartSeconds = processing ? this.toSourceSeconds(start) : 0;
     }
     this.pendingSeekSeconds = processing ? null : start;
-    this.streamUrl = this.buildStreamUrl(environment.audioApiBaseUrl, processing ? start : 0);
+    this.streamUrl = this.audioApi.buildStreamUrl(this.currentProcessingParams(), processing ? start : 0);
     this.refreshMetadata();
 
     if (!audio) return;
@@ -295,20 +275,7 @@ export class AppComponent implements AfterViewInit, OnInit, OnDestroy {
   }
 
   private refreshMetadata(): void {
-    const url = this.buildMetadataUrl(environment.audioApiBaseUrl);
-    fetch(url)
-      .then((response) => {
-        if (!response.ok) return null;
-        return response.json() as Promise<{ sourceDurationSeconds: number }>;
-      })
-      .then((data) => {
-        if (!data) return;
-        this.sourceDurationSeconds = Number.isFinite(data.sourceDurationSeconds)
-          ? data.sourceDurationSeconds
-          : this.sourceDurationSeconds;
-        this.updateProcessedDuration();
-      })
-      .catch(() => undefined);
+    this.metadataRefresh$.next();
   }
 
   /** True when tempo or pitch differ from default; used to show processed waveform and drive stream updates. */
@@ -358,5 +325,13 @@ export class AppComponent implements AfterViewInit, OnInit, OnDestroy {
     if (!Number.isFinite(value)) return 0;
     const rounded = Math.round(value / this.pitchStep) * this.pitchStep;
     return Math.abs(rounded) < 0.001 ? 0 : rounded;
+  }
+
+  private currentProcessingParams(): AudioProcessingParams {
+    return {
+      tempoPercent: this.tempoPercent,
+      preservePitch: this.preservePitch,
+      pitchSemitones: this.pitchSemitones,
+    };
   }
 }

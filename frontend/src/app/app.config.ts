@@ -3,7 +3,16 @@ import { provideRouter } from '@angular/router';
 
 import { routes } from './app.routes';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
+import { provideHttpClient } from '@angular/common/http';
+import { AUDIO_API_BASE_URL } from './audio-api.token';
+import { environment } from '../environments/environment';
 
 export const appConfig: ApplicationConfig = {
-  providers: [provideZoneChangeDetection({ eventCoalescing: true }), provideRouter(routes), provideAnimationsAsync(), provideAnimationsAsync()]
+  providers: [
+    provideZoneChangeDetection({ eventCoalescing: true }),
+    provideRouter(routes),
+    provideAnimationsAsync(),
+    provideHttpClient(),
+    { provide: AUDIO_API_BASE_URL, useValue: environment.audioApiBaseUrl },
+  ]
 };
