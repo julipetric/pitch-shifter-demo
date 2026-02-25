@@ -26,7 +26,16 @@
           />
         </mat-slider>
         <div class="time">
-          {{ formatTime(currentTime) }} / {{ formatTime(duration) }}
+          {{ currentTime | formatTime }} / {{ duration | formatTime }}
+          @if (metadata$ | async; as meta) {
+            <div class="meta">
+              Source: {{ meta.sourceDurationSeconds | formatTime }}
+              <span class="separator">•</span>
+              Processed (API): {{ meta.processedDurationSeconds | formatTime }}
+            </div>
+          } @else {
+            <div class="meta meta-loading">Loading metadata…</div>
+          }
         </div>
       </div>
 
@@ -74,15 +83,29 @@
       <div class="waveform-panel">
         <div class="waveform-window">
           <div class="waveform-label">Original</div>
-          <app-waveform-snippet [streamUrl]="originalStreamUrl" [progress]="originalProgress" />
+          @defer (on idle) {
+            <app-waveform-snippet [streamUrl]="originalStreamUrl" [progress]="originalProgress" />
+          } @placeholder {
+            <div class="waveform-placeholder">Loading waveform…</div>
+          }
         </div>
-        <div class="waveform-window" [class.hidden]="!isProcessingActive">
+        <div class="waveform-window">
           <div class="waveform-label">Processed</div>
-          <app-waveform-snippet
-            [streamUrl]="isProcessingActive ? streamUrl : null"
-            [progress]="processedProgress"
-            [deferColoring]="true"
-          />
+          @if (isProcessingActive) {
+            @defer (on idle) {
+              <app-waveform-snippet
+                [streamUrl]="streamUrl"
+                [progress]="processedProgress"
+                [deferColoring]="true"
+              />
+            } @placeholder {
+              <div class="waveform-placeholder">Loading processed waveform…</div>
+            }
+          } @else {
+            <div class="waveform-placeholder waveform-placeholder--disabled">
+              Adjust tempo or pitch to show processed waveform.
+            </div>
+          }
         </div>
       </div>
     </mat-card-content>

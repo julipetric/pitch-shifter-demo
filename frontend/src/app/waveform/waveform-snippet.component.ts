@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  ChangeDetectorRef,
   ElementRef,
   Input,
   OnChanges,
@@ -51,6 +52,10 @@ export class WaveformSnippetComponent implements OnInit, OnChanges, OnDestroy, A
   private pendingFreqCompute = false;
   private freqComputeTimer: number | null = null;
   private freqComputeToken = 0;
+  isLoading = true;
+  isAnalyzing = false;
+
+  constructor(private readonly cdr: ChangeDetectorRef) {}
 
   ngOnInit(): void {}
 
@@ -69,6 +74,9 @@ export class WaveformSnippetComponent implements OnInit, OnChanges, OnDestroy, A
       this.normalizationPeak = 1;
       this.pendingFreqCompute = true;
       this.freqComputeToken += 1;
+      this.isLoading = true;
+      this.isAnalyzing = false;
+      this.cdr.markForCheck();
       if (this.freqComputeTimer !== null) {
         window.clearTimeout(this.freqComputeTimer);
         this.freqComputeTimer = null;
@@ -130,11 +138,15 @@ export class WaveformSnippetComponent implements OnInit, OnChanges, OnDestroy, A
     this.wavesurfer.on('ready', () => {
       const p = Math.max(0, Math.min(1, this.progress));
       this.wavesurfer?.seekTo(p);
+      this.isLoading = false;
+      this.cdr.markForCheck();
       if (this.pendingFreqCompute) {
         this.pendingFreqCompute = false;
         this.freqComputeAbort = false;
         const token = this.freqComputeToken;
         if (this.deferColoring) {
+          this.isAnalyzing = true;
+          this.cdr.markForCheck();
           this.scheduleDeferredFrequencyCompute(token);
         } else {
           this.computeFrequencyBySegment();
@@ -218,6 +230,11 @@ export class WaveformSnippetComponent implements OnInit, OnChanges, OnDestroy, A
       } catch {
         break;
       }
+    }
+
+    if (!this.freqComputeAbort) {
+      this.isAnalyzing = false;
+      this.cdr.markForCheck();
     }
   }
 

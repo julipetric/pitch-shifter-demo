@@ -1,4 +1,5 @@
 /docs/starting-points
+_tmp/
 
 # Root-level publish output (e.g. from deploy scripts)
 publish/
