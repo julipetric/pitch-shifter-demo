@@ -6,27 +6,16 @@ import {
   Input,
   OnChanges,
   OnDestroy,
-  OnInit,
   SimpleChanges,
   ViewChild,
   AfterViewInit,
 } from '@angular/core';
 import WaveSurfer from 'wavesurfer.js';
+import { WaveformFrequencyService } from './waveform-frequency.service';
 
-const FFT_SIZE = 2048;
-const NUM_FREQ_SEGMENTS = 128;
-/** Segments per chunk: yield and re-render after each chunk. Larger = faster total time, smaller = more responsive UI. */
-const FREQ_CHUNK_SIZE = 8;
 const BAR_WIDTH = 2;
 const BAR_GAP = 1;
 const BAR_RADIUS = 1;
-const MAX_FREQ_HZ = 4000;
-
-/** Map frequency (Hz) to HSL hue: low=red, mid=purple, high=blue (like reference image). */
-function frequencyToHue(freqHz: number): number {
-  const t = Math.min(1, Math.max(0, freqHz / MAX_FREQ_HZ));
-  return Math.round(t * 280) % 360;
-}
 
 @Component({
   selector: 'app-waveform-snippet',
@@ -34,8 +23,9 @@ function frequencyToHue(freqHz: number): number {
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './waveform-snippet.component.html',
   styleUrl: './waveform-snippet.component.css',
+  providers: [WaveformFrequencyService],
 })
-export class WaveformSnippetComponent implements OnInit, OnChanges, OnDestroy, AfterViewInit {
+export class WaveformSnippetComponent implements OnChanges, OnDestroy, AfterViewInit {
   @ViewChild('container', { read: ElementRef }) containerRef?: ElementRef<HTMLDivElement>;
 
   /** Stream URL to load and display (original or processed). No playback – visualization only. */
@@ -46,21 +36,19 @@ export class WaveformSnippetComponent implements OnInit, OnChanges, OnDestroy, A
   @Input() deferColoring = false;
 
   private wavesurfer: WaveSurfer | null = null;
-  private frequencyBySegment: (number | undefined)[] = [];
-  private normalizationPeak = 1;
-  private freqComputeAbort = false;
+  private freqAbortController: AbortController | null = null;
   private pendingFreqCompute = false;
   private freqComputeTimer: number | null = null;
   private freqComputeToken = 0;
   isLoading = true;
   isAnalyzing = false;
 
-  constructor(private readonly cdr: ChangeDetectorRef) {}
-
-  ngOnInit(): void {}
+  constructor(
+    private readonly cdr: ChangeDetectorRef,
+    private readonly freqService: WaveformFrequencyService
+  ) {}
 
   ngAfterViewInit(): void {
-    // Defer until after layout so the container has non-zero dimensions
     requestAnimationFrame(() => {
       requestAnimationFrame(() => this.initWaveSurfer());
     });
@@ -69,9 +57,8 @@ export class WaveformSnippetComponent implements OnInit, OnChanges, OnDestroy, A
   ngOnChanges(changes: SimpleChanges): void {
     const url = changes['streamUrl']?.currentValue as string | null | undefined;
     if (changes['streamUrl']) {
-      this.freqComputeAbort = true;
-      this.frequencyBySegment = [];
-      this.normalizationPeak = 1;
+      this.freqAbortController?.abort();
+      this.freqService.reset();
       this.pendingFreqCompute = true;
       this.freqComputeToken += 1;
       this.isLoading = true;
@@ -86,7 +73,7 @@ export class WaveformSnippetComponent implements OnInit, OnChanges, OnDestroy, A
       this.wavesurfer.load(url).catch(() => {});
     }
     if (changes['progress'] && this.wavesurfer && this.wavesurfer.getDuration() > 0) {
-      const p = Math.max(0, Math.min(1, Number(changes['progress'].currentValue) || 0));
+      const p = Math.max(0, Math.min(1, Number(changes['progress'].currentValue) ?? 0));
       this.wavesurfer.seekTo(p);
     }
   }
@@ -96,6 +83,7 @@ export class WaveformSnippetComponent implements OnInit, OnChanges, OnDestroy, A
       window.clearTimeout(this.freqComputeTimer);
       this.freqComputeTimer = null;
     }
+    this.freqAbortController?.abort();
     this.destroyWaveSurfer();
   }
 
@@ -142,14 +130,14 @@ export class WaveformSnippetComponent implements OnInit, OnChanges, OnDestroy, A
       this.cdr.markForCheck();
       if (this.pendingFreqCompute) {
         this.pendingFreqCompute = false;
-        this.freqComputeAbort = false;
+        this.freqAbortController = new AbortController();
         const token = this.freqComputeToken;
         if (this.deferColoring) {
           this.isAnalyzing = true;
           this.cdr.markForCheck();
           this.scheduleDeferredFrequencyCompute(token);
         } else {
-          this.computeFrequencyBySegment();
+          this.runFrequencyCompute();
         }
       }
     });
@@ -166,23 +154,22 @@ export class WaveformSnippetComponent implements OnInit, OnChanges, OnDestroy, A
     const barSpacing = BAR_WIDTH + BAR_GAP;
     const numBars = Math.floor(canvasWidth / barSpacing) || 1;
 
-    const normalization = this.normalizationPeak > 0 ? this.normalizationPeak : 1;
-
-    const freqSegments = this.frequencyBySegment;
+    const normalization = this.freqService.getNormalizationPeak() || 1;
+    const freqSegments = this.freqService.getFrequencyBySegment();
+    const numFreqSegments = this.freqService.numFreqSegments;
 
     for (let i = 0; i < numBars; i++) {
       const sampleIndex = Math.floor((i / numBars) * len);
       const value = (channelData[sampleIndex] ?? 0) as number;
       const normalizedValue = Math.max(-1, Math.min(1, value / normalization));
-      // Scale to full height so the highest peak occupies 100% of the height.
       const barHeight = Math.max(1, Math.abs(normalizedValue) * canvasHeight);
       const x = i * barSpacing;
       const y = halfHeight - barHeight / 2;
 
-      const segIndex = Math.min(Math.floor((i / numBars) * NUM_FREQ_SEGMENTS), NUM_FREQ_SEGMENTS - 1);
+      const segIndex = Math.min(Math.floor((i / numBars) * numFreqSegments), numFreqSegments - 1);
       const freqHz = freqSegments[segIndex];
       if (freqHz !== undefined && Number.isFinite(freqHz)) {
-        const hue = frequencyToHue(freqHz);
+        const hue = this.freqService.frequencyToHue(freqHz);
         ctx.fillStyle = `hsla(${hue}, 75%, 58%, 0.92)`;
       } else {
         ctx.fillStyle = 'hsl(210, 45%, 55%)';
@@ -199,108 +186,36 @@ export class WaveformSnippetComponent implements OnInit, OnChanges, OnDestroy, A
     }
   }
 
-  private async computeFrequencyBySegment(): Promise<void> {
+  private async runFrequencyCompute(): Promise<void> {
     const buffer = this.wavesurfer?.getDecodedData() ?? null;
-    if (!buffer) return;
+    if (!buffer || !this.freqAbortController) return;
 
-    this.freqComputeAbort = false;
-    this.frequencyBySegment = new Array(NUM_FREQ_SEGMENTS);
-    const sampleRate = buffer.sampleRate;
-    const channel = buffer.getChannelData(0);
-    const length = channel.length;
-    const step = Math.max(1, Math.floor((length - FFT_SIZE) / NUM_FREQ_SEGMENTS));
-    this.normalizationPeak = await this.computeNormalizationPeakAsync(channel);
+    this.isAnalyzing = true;
+    this.cdr.markForCheck();
 
-    for (let chunkStart = 0; chunkStart < NUM_FREQ_SEGMENTS && !this.freqComputeAbort; chunkStart += FREQ_CHUNK_SIZE) {
-      const chunkEnd = Math.min(chunkStart + FREQ_CHUNK_SIZE, NUM_FREQ_SEGMENTS);
-      for (let s = chunkStart; s < chunkEnd; s++) {
-        const offset = Math.min(s * step, length - FFT_SIZE);
-        if (offset < 0) {
-          this.frequencyBySegment[s] = 0;
-          continue;
+    await this.freqService.computeFrequencyBySegment(buffer, {
+      signal: this.freqAbortController.signal,
+      onChunkDone: () => {
+        try {
+          this.wavesurfer?.getRenderer().reRender();
+        } catch {
+          // ignore
         }
-        const slice = channel.slice(offset, offset + FFT_SIZE);
-        const segmentBuffer = this.audioBufferSlice(slice, sampleRate);
-        const freqHz = await this.peakFrequencyFromBuffer(segmentBuffer, sampleRate);
-        this.frequencyBySegment[s] = freqHz;
-      }
-      await this.yieldToMain();
-      try {
-        this.wavesurfer?.getRenderer().reRender();
-      } catch {
-        break;
-      }
-    }
+      },
+    });
 
-    if (!this.freqComputeAbort) {
+    if (!this.freqAbortController.signal.aborted) {
       this.isAnalyzing = false;
       this.cdr.markForCheck();
     }
   }
 
-  /** Yield to main thread so UI can update and stay responsive during long frequency computation. */
-  private yieldToMain(): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, 0));
-  }
-
   private scheduleDeferredFrequencyCompute(token: number): void {
     this.freqComputeTimer = window.setTimeout(() => {
       this.freqComputeTimer = null;
-      if (this.freqComputeAbort || token !== this.freqComputeToken) return;
-      this.computeFrequencyBySegment();
+      if (this.freqAbortController?.signal.aborted || token !== this.freqComputeToken) return;
+      this.runFrequencyCompute();
     }, 400);
-  }
-
-  private audioBufferSlice(samples: Float32Array, sampleRate: number): AudioBuffer {
-    const ctx = new OfflineAudioContext(1, samples.length, sampleRate);
-    const buf = ctx.createBuffer(1, samples.length, sampleRate);
-    buf.getChannelData(0).set(samples);
-    return buf;
-  }
-
-  private async computeNormalizationPeakAsync(channel: Float32Array): Promise<number> {
-    let maxAbs = 0;
-    const length = channel.length;
-    const chunkSize = Math.max(4096, Math.floor(length / 64));
-    for (let i = 0; i < length; i += chunkSize) {
-      const end = Math.min(length, i + chunkSize);
-      for (let j = i; j < end; j++) {
-        const v = channel[j] ?? 0;
-        maxAbs = Math.max(maxAbs, Math.abs(v));
-      }
-      if (this.freqComputeAbort) {
-        return maxAbs > 0 ? maxAbs : 1;
-      }
-      await this.yieldToMain();
-    }
-    return maxAbs > 0 ? maxAbs : 1;
-  }
-
-  private async peakFrequencyFromBuffer(buffer: AudioBuffer, sampleRate: number): Promise<number> {
-    const ctx = new OfflineAudioContext(1, FFT_SIZE, sampleRate);
-    const source = ctx.createBufferSource();
-    source.buffer = buffer;
-    const analyser = ctx.createAnalyser();
-    analyser.fftSize = FFT_SIZE;
-    analyser.smoothingTimeConstant = 0;
-    source.connect(analyser);
-    analyser.connect(ctx.destination);
-    source.start(0);
-    await ctx.startRendering();
-
-    const data = new Float32Array(analyser.frequencyBinCount);
-    analyser.getFloatFrequencyData(data);
-
-    let maxMag = -Infinity;
-    let peakBin = 0;
-    for (let i = 1; i < data.length; i++) {
-      const v = data[i] ?? -Infinity;
-      if (v > maxMag && Number.isFinite(v)) {
-        maxMag = v;
-        peakBin = i;
-      }
-    }
-    return (peakBin * sampleRate) / FFT_SIZE;
   }
 
   private destroyWaveSurfer(): void {
