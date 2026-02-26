@@ -6,9 +6,9 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatSliderModule } from '@angular/material/slider';
 import { MatSlideToggleChange, MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { Subject } from 'rxjs';
-import { debounceTime, distinctUntilChanged, shareReplay, startWith, switchMap, takeUntil, tap } from 'rxjs/operators';
+import { debounceTime, distinctUntilChanged, takeUntil } from 'rxjs/operators';
 import { WaveformSnippetComponent } from './waveform/waveform-snippet.component';
-import { AudioApiService, AudioProcessingParams } from './services/audio-api.service';
+import { AudioFacadeService } from './services/audio-facade.service';
 import { FormatTimePipe } from './pipes/format-time.pipe';
 
 @Component({
@@ -30,12 +30,9 @@ import { FormatTimePipe } from './pipes/format-time.pipe';
 export class AppComponent implements AfterViewInit, OnInit, OnDestroy {
   @ViewChild('audioRef') audioRef?: ElementRef<HTMLAudioElement>;
 
-  private readonly audioApi = inject(AudioApiService);
+  private readonly audioFacade = inject(AudioFacadeService);
 
   title = 'Pitch Shifter Demo';
-  tempoPercent = 100;
-  preservePitch = true;
-  pitchSemitones = 0;
 
   readonly tempoMin = 50;
   readonly tempoMax = 125;
@@ -43,13 +40,13 @@ export class AppComponent implements AfterViewInit, OnInit, OnDestroy {
   readonly pitchMax = 12;
   readonly pitchStep = 0.5;
 
-  streamUrl = this.audioApi.buildStreamUrl(this.currentProcessingParams());
+  streamUrl = this.audioFacade.buildStreamUrl();
   /** Start position (in source seconds) for the original waveform; only updated on seek/tempo so pitch-only changes do not reload the original. */
   private originalStreamStartSeconds = 0;
   /** URL for original (unprocessed) stream. Uses originalStreamStartSeconds so changing pitch alone does not reprocess/reload the original. */
   get originalStreamUrl(): string {
     const startSeconds = this.isProcessingActive ? this.originalStreamStartSeconds : 0;
-    return this.audioApi.buildOriginalStreamUrl(startSeconds);
+    return this.audioFacade.buildOriginalStreamUrl(startSeconds);
   }
   streamOffsetSeconds = 0;
   private readonly updateDelayMs = 300;
@@ -57,23 +54,9 @@ export class AppComponent implements AfterViewInit, OnInit, OnDestroy {
   private pendingSeekSeconds: number | null = null;
   private sourceDurationSeconds = 0;
   private readonly controlChange$ = new Subject<number>();
-  private readonly metadataRefresh$ = new Subject<void>();
   private readonly destroy$ = new Subject<void>();
 
-  readonly metadata$ = this.metadataRefresh$.pipe(
-    startWith(void 0),
-    switchMap(() => {
-      return this.audioApi.getMetadata$(this.currentProcessingParams());
-    }),
-    tap((data) => {
-      if (!data) return;
-      if (Number.isFinite(data.sourceDurationSeconds) && data.sourceDurationSeconds > 0) {
-        this.sourceDurationSeconds = data.sourceDurationSeconds;
-        this.updateProcessedDuration();
-      }
-    }),
-    shareReplay({ bufferSize: 1, refCount: true })
-  );
+  readonly metadata$ = this.audioFacade.metadata$;
 
   isPlaying = false;
   currentTime = 0;
@@ -81,6 +64,30 @@ export class AppComponent implements AfterViewInit, OnInit, OnDestroy {
   seekValue = 0;
   volume = 0.8;
   isSeeking = false;
+
+  get tempoPercent(): number {
+    return this.audioFacade.tempoPercent;
+  }
+
+  set tempoPercent(value: number) {
+    this.audioFacade.setTempoPercent(value);
+  }
+
+  get preservePitch(): boolean {
+    return this.audioFacade.preservePitch;
+  }
+
+  set preservePitch(value: boolean) {
+    this.audioFacade.setPreservePitch(value);
+  }
+
+  get pitchSemitones(): number {
+    return this.audioFacade.pitchSemitones;
+  }
+
+  set pitchSemitones(value: number) {
+    this.audioFacade.setPitchSemitones(value);
+  }
 
   ngOnInit(): void {
     this.controlChange$
@@ -99,6 +106,15 @@ export class AppComponent implements AfterViewInit, OnInit, OnDestroy {
     if (audio) {
       audio.volume = this.volume;
     }
+    this.metadata$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((data) => {
+        if (!data) return;
+        if (Number.isFinite(data.sourceDurationSeconds) && data.sourceDurationSeconds > 0) {
+          this.sourceDurationSeconds = data.sourceDurationSeconds;
+          this.updateProcessedDuration();
+        }
+      });
     this.refreshMetadata();
   }
 
@@ -254,7 +270,7 @@ export class AppComponent implements AfterViewInit, OnInit, OnDestroy {
       this.originalStreamStartSeconds = processing ? this.toSourceSeconds(start) : 0;
     }
     this.pendingSeekSeconds = processing ? null : start;
-    this.streamUrl = this.audioApi.buildStreamUrl(this.currentProcessingParams(), processing ? start : 0);
+    this.streamUrl = this.audioFacade.buildStreamUrl(processing ? start : 0);
     this.refreshMetadata();
 
     if (!audio) return;
@@ -275,12 +291,12 @@ export class AppComponent implements AfterViewInit, OnInit, OnDestroy {
   }
 
   private refreshMetadata(): void {
-    this.metadataRefresh$.next();
+    this.audioFacade.refreshMetadata();
   }
 
   /** True when tempo or pitch differ from default; used to show processed waveform and drive stream updates. */
   get isProcessingActive(): boolean {
-    return this.tempoPercent !== 100 || this.pitchSemitones !== 0;
+    return this.audioFacade.isProcessingActive();
   }
 
   /** Progress 0–1 for the original waveform (source timeline). */
@@ -327,11 +343,4 @@ export class AppComponent implements AfterViewInit, OnInit, OnDestroy {
     return Math.abs(rounded) < 0.001 ? 0 : rounded;
   }
 
-  private currentProcessingParams(): AudioProcessingParams {
-    return {
-      tempoPercent: this.tempoPercent,
-      preservePitch: this.preservePitch,
-      pitchSemitones: this.pitchSemitones,
-    };
-  }
 }
