@@ -12,21 +12,24 @@
 - **Angular + TypeScript**: component-based UI and strong typing.
 - **Angular Material**: component library for UI (buttons, sliders, cards, etc.).
 - **RxJS**: input streams for pitch/tempo sliders with `debounceTime` (implemented) or `throttleTime`.
-- **Web Audio API**: `AudioContext`, `AnalyserNode` for waveform/frequency analysis.
-- **Canvas 2D**: efficient waveform rendering.
+- **Web Audio API**: `decodeAudioData` (via WaveSurfer.js) and `OfflineAudioContext` + `AnalyserNode` for waveform/frequency analysis.
+- **WaveSurfer.js**: loads and decodes the streams and renders the waveform on a canvas through a custom bar renderer.
+- **Canvas 2D**: waveform rendering.
 - **Performance patterns**: `ChangeDetectionStrategy.OnPush`, `trackBy` in lists, `async` pipe.
 
 ### Backend (.NET)
 - **ASP.NET Core Web Minimal API**: streaming endpoints and parameterized audio processing.
-- **NAudio**: audio file decoding and sample pipeline.
-- **Custom processing layer**: `IAudioProcessor` abstraction and an `ISampleProvider`-style implementation for pitch/tempo changes.
+- **NAudio** with **NLayer** (managed MP3 decoder): audio file decoding and sample pipeline.
+- **SoundTouch.Net**: time-stretching and pitch-shifting behind the `IAudioProcessor` abstraction.
+- **NAudio.Lame**: MP3 encoding of processed output.
 - **Async I/O**: `async/await` streaming to avoid thread starvation.
  - **Processed output**: MP3 streaming for reduced payload size; range disabled for processed streams.
 
 ## Supporting tech
 - **Logging**: built-in `ILogger` (optional Serilog later).
-- **Testing**: xUnit for .NET, Angular test runner for UI components and waveform logic.
-- **Build/CI**: GitHub Actions for simple build/test pipelines.
+- **Testing**: xUnit for .NET (unit tests plus in-process HTTP tests), Jasmine/Karma for the Angular app.
+- **Build/CI**: GitHub Actions builds and tests both halves and smoke-tests the Docker Compose stack.
+- **Containers**: Docker Compose runs the API and an nginx-served frontend behind one port.
 - **Storage**: local sample audio files (demo) with optional user upload in future.
 
 ## Deployment (free-tier first)
@@ -45,8 +48,8 @@
 
 ## Mapping to requirements and showcase concepts
 - **Pitch/tempo control**: .NET processing layer using NAudio + custom logic.
-- **Waveform analyzer**: Web Audio API `AnalyserNode` + Canvas in Angular.
+- **Waveform analyzer**: WaveSurfer.js decoding + Web Audio `AnalyserNode` for dominant-frequency colouring, drawn on a Canvas in Angular.
 - **Performance**: OnPush, RxJS throttle/debounce, async streaming.
 - **Metadata**: `/api/audio/metadata` provides source/processed durations for tempo-aware UI.
-- **SOLID/DIP**: `IAudioProcessor` and `IAudioSource` interfaces.
+- **SOLID/DIP**: `IAudioProcessor` and `IAudioStreamService` interfaces.
 - **Networking awareness**: chunked HTTP streaming now; UDP/RTP discussion for future improvements.

@@ -24,6 +24,8 @@ to install the required tools and verify they are available on your machine.
 
 ## Optional tools
 
+- **Docker with Compose:** runs the whole app with `docker compose up --build`, and is the way to
+  run the API on Linux or macOS (see the [README](../README.md#quick-start)).
 - **Editor/IDE:** VS Code, Visual Studio, or Rider.
 - **API testing:** Postman or curl.
 
