@@ -77,7 +77,10 @@
                   "maximumError": "4kB"
                 }
               ],
-              "outputHashing": "all"
+              "outputHashing": "all",
+              "define": {
+                "AUDIO_API_BASE_URL": "''"
+              }
             },
             "development": {
               "optimization": false,
