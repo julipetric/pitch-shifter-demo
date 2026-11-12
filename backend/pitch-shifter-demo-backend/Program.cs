@@ -22,11 +22,23 @@ builder.Services.AddSingleton<IAudioStreamService, AudioStreamService>();
 builder.Services.AddSingleton<IAudioProcessor, SoundTouchAudioProcessor>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+// Cross-origin access is opt-in: only the origins listed under Cors:AllowedOrigins
+// (env var Cors__AllowedOrigins__0, Cors__AllowedOrigins__1, ...) may call the API from a
+// browser. With no origins configured, only same-origin callers (e.g. through a reverse proxy) work.
+var allowedOrigins = builder.Configuration
+    .GetSection("Cors:AllowedOrigins")
+    .Get<string[]>()?
+    .Where(origin => !string.IsNullOrWhiteSpace(origin))
+    .Select(origin => origin.Trim().TrimEnd('/'))
+    .ToArray() ?? [];
 builder.Services.AddCors(options =>
 {
+    if (allowedOrigins.Length == 0) return;
+
     options.AddDefaultPolicy(policy =>
     {
-        policy.WithOrigins("http://localhost:4200")
+        policy.WithOrigins(allowedOrigins)
             .AllowAnyMethod()
             .AllowAnyHeader();
     });
@@ -45,7 +57,13 @@ if (swaggerEnabled)
 }
 
 app.UseCors();
-app.UseHttpsRedirection();
+
+// Behind a TLS-terminating proxy or container port mapping there is no HTTPS endpoint to
+// redirect to; set HttpsRedirection:Enabled=false in that case.
+if (builder.Configuration.GetValue("HttpsRedirection:Enabled", true))
+{
+    app.UseHttpsRedirection();
+}
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }))
     .WithName("Health")
@@ -171,3 +189,6 @@ app.MapGet("/diagnostics/audio", (IOptions<AudioOptions> options, IWebHostEnviro
     .WithOpenApi();
 
 app.Run();
+
+/// <summary>Entry-point marker that lets integration tests host the app in-process.</summary>
+public partial class Program;
