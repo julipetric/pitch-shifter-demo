@@ -1,6 +1,6 @@
-# Deploying the frontend (Hello World) to Azure
+# Deploying the frontend to Azure
 
-This guide walks you through everything you need to build and deploy the **pitch-shifter-demo-frontend** Angular app to Azure so the hello-world app is reachable in the cloud.
+This guide walks you through building the **pitch-shifter-demo-frontend** Angular app and hosting it on Azure. The app calls the backend API, so deploy the backend first ([backend guide](AZURE-BACKEND-DEPLOY.md)); the overview in [DEPLOYMENT.md](DEPLOYMENT.md) shows both halves together.
 
 ---
 
@@ -30,8 +30,13 @@ From the **repository root**:
 ```bash
 cd frontend
 npm ci
-npm run build
+npx ng build --configuration production --define AUDIO_API_BASE_URL="'https://<backend-app>.azurewebsites.net'"
 ```
+
+`AUDIO_API_BASE_URL` is the address the browser uses for API calls. It is empty by default, which means
+"the origin that served the page" (the Docker setup). When the API lives on another host, pass it as above
+(the inner single quotes make it a JavaScript string) and add the frontend origin to the backend's
+`Cors__AllowedOrigins__0` setting.
 
 - **Build output (important for deployment):**  
   Static files are emitted under:
@@ -79,8 +84,8 @@ When connecting a **build from this repo**, use:
 | **App location**     | `frontend`                                                            |
 | **Build output**     | `frontend/dist/pitch-shifter-demo-frontend/browser`                   |
 
-- **Api location:** leave empty for this hello-world app.  
-- **Build command:** e.g. `npm run build --prefix frontend` or run `npm ci && npm run build` inside `frontend` (depends how your pipeline is set up).
+- **Api location:** leave empty; the API is a separate App Service.  
+- **Build command:** `npm ci && npx ng build --configuration production --define AUDIO_API_BASE_URL="'https://<backend-app>.azurewebsites.net'"` inside `frontend`.
 
 If you deploy **manually** (e.g. with [SWA CLI](https://azurestaticwebapps.dev/docs/cli/)), build locally as above, then deploy the contents of `frontend/dist/pitch-shifter-demo-frontend/browser` as the app:
 
@@ -95,7 +100,7 @@ npx @azure/static-web-apps-cli deploy dist/pitch-shifter-demo-frontend/browser -
 
 - In the Azure Portal, open your Static Web App → **Overview**.  
 - Use the **URL** (e.g. `https://pitch-shifter-demo-frontend.azurestaticapps.net`).  
-- Opening it should show the Angular hello-world page (toolbar + “Hello world” card).
+- Opening it should show the Pitch Shifter Demo page with the transport card and the waveform card.
 
 ---
 
@@ -137,7 +142,7 @@ For client-side routing, configure the server to serve `index.html` for non-file
 | Item                | Value                                                                 |
 |---------------------|-----------------------------------------------------------------------|
 | **Project path**    | `frontend` (from repo root)                                           |
-| **Build command**   | `npm run build` (run inside `frontend`)                              |
+| **Build command**   | `npx ng build --configuration production --define AUDIO_API_BASE_URL="'<api-url>'"` (inside `frontend`) |
 | **Build output**    | `frontend/dist/pitch-shifter-demo-frontend/browser`                   |
 | **Site root**       | Contents of the `browser` folder (index.html at root)                 |
 | **Deployment source** | Azure Static Web Apps (GitHub/CLI/manual) or App Service (zip/CLI/extension) |
@@ -147,7 +152,9 @@ For client-side routing, configure the server to serve `index.html` for non-file
 ## Verify deployment
 
 1. Open the app URL (Static Web Apps or App Service).  
-2. You should see the **pitch-shifter-demo-frontend** toolbar and the “Hello world” card.  
+2. You should see the **Pitch Shifter Demo** toolbar, the audio transport card and the waveform card.
+   Press Play; if the stream does not start, check the browser console for CORS errors and confirm the
+   backend's `Cors__AllowedOrigins__0` matches the page origin exactly.  
 3. If you see a blank page, check that the **site root** is set to the **browser** folder (or that `index.html` is at the root of what’s deployed) and that base href is correct (default `/` is fine for root).
 
 ---
@@ -156,4 +163,4 @@ For client-side routing, configure the server to serve `index.html` for non-file
 
 - Add a **custom domain** and **HTTPS** in the Azure resource (usually one-click).  
 - Wire up **GitHub Actions** or **Azure DevOps** to build and deploy on push.  
-- For production, consider **staging slots** and **environment-specific config** (e.g. API base URL via environment or app settings).
+- For production, consider **staging slots**. The API base URL is fixed at build time, so build once per environment.

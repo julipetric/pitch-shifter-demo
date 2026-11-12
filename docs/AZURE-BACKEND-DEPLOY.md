@@ -31,14 +31,16 @@ Use existing resources if you already have them.
 ```
 az login
 az group create --name <resource-group> --location <location>
-az appservice plan create --name <app-plan> --resource-group <resource-group> --sku B1 --is-linux
-az webapp create --name <app-name> --resource-group <resource-group> --plan <app-plan> --runtime "DOTNET|8.0"
+az appservice plan create --name <app-plan> --resource-group <resource-group> --sku B1
+az webapp create --name <app-name> --resource-group <resource-group> --plan <app-plan> --runtime "dotnet:8"
 ```
 
 Notes:
 - If you already have a Resource Group, skip the `az group create` step and reuse your existing group name.
 - `<app-plan>` is the **App Service Plan** name. It defines the pricing tier, region, OS, and compute resources that host your web app.
-- For Windows plans, remove `--is-linux` and keep the runtime as `DOTNET|8.0`.
+- The plan is a **Windows** plan (the default). NAudio.Lame bundles a Windows build of LAME, which the
+  published output contains. A Linux plan needs the container image from `backend/Dockerfile`, which
+  installs `libmp3lame`; see [DEPLOYMENT.md](DEPLOYMENT.md).
 - `<app-name>` must be globally unique (this becomes `<app-name>.azurewebsites.net`).
 
 ## 3) Deploy the published output
@@ -65,7 +67,9 @@ az webapp config appsettings set --resource-group <resource-group> --name <app-n
 
 Configuration notes:
 - App Service manages the listening port; do not hardcode a port in the app.
-- Additional settings can be added here as the backend grows (e.g., storage, auth).
+- Browser calls from another origin are rejected unless that origin is listed in `Cors__AllowedOrigins__0`
+  (`Cors__AllowedOrigins__1`, ... for more). Set it to the origin that serves the frontend, for example
+  `az webapp config appsettings set --resource-group <resource-group> --name <app-name> --settings "Cors__AllowedOrigins__0=https://<frontend-host>"`.
 - Audio streaming defaults to `Content/Samples`; to target a specific file, set `Audio__SamplesPath=Content/Samples` and `Audio__DefaultFileName=<your-file.ext>`. Set `Audio__EnableFallbackTone=false` to disable the generated demo tone when no file is available.
 
 ## 5) Validate the deployment
