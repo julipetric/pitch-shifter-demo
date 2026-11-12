@@ -12,7 +12,7 @@ describe('FormatTimePipe', () => {
     expect(pipe.transform(9)).toBe('0:09');
   });
 
-  it('truncates fractional seconds instead of rounding up', () => {
+  it('truncates fractional seconds', () => {
     expect(pipe.transform(59.99)).toBe('0:59');
     expect(pipe.transform(125.3)).toBe('2:05');
   });
