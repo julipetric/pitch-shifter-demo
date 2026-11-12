@@ -66,7 +66,7 @@ flowchart TD
 
 ## Non-functional considerations
 - **Latency**: chunked streaming, small buffers, async I/O.
-- **Performance**: throttled/debounced slider events (RxJS).
+- **Performance**: debounced slider events (RxJS).
 - **Scalability**: stateless API, no in-memory session state.
 - **Reliability**: if the source cannot be opened for processing, the original file is streamed; if no usable sample exists, a generated tone is served (configurable).
 

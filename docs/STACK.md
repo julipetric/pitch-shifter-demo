@@ -11,11 +11,11 @@
 ### Frontend (Angular)
 - **Angular + TypeScript**: component-based UI and strong typing.
 - **Angular Material**: component library for UI (buttons, sliders, cards, etc.).
-- **RxJS**: input streams for pitch/tempo sliders with `debounceTime` (implemented) or `throttleTime`.
+- **RxJS**: pitch/tempo slider changes are debounced (`debounceTime` + `distinctUntilChanged`) before a new stream is requested.
 - **Web Audio API**: `decodeAudioData` (via WaveSurfer.js) and `OfflineAudioContext` + `AnalyserNode` for waveform/frequency analysis.
 - **WaveSurfer.js**: loads and decodes the streams and renders the waveform on a canvas through a custom bar renderer.
 - **Canvas 2D**: waveform rendering.
-- **Performance patterns**: `ChangeDetectionStrategy.OnPush`, `trackBy` in lists, `async` pipe.
+- **Performance patterns**: `ChangeDetectionStrategy.OnPush` on the waveform component, `@defer` for the waveform views, `async` pipe for metadata.
 
 ### Backend (.NET)
 - **ASP.NET Core Web Minimal API**: streaming endpoints and parameterized audio processing.
@@ -26,11 +26,11 @@
  - **Processed output**: MP3 streaming for reduced payload size; range disabled for processed streams.
 
 ## Supporting tech
-- **Logging**: built-in `ILogger` (optional Serilog later).
+- **Logging**: built-in `ILogger`.
 - **Testing**: xUnit for .NET (unit tests plus in-process HTTP tests), Jasmine/Karma for the Angular app.
 - **Build/CI**: GitHub Actions builds and tests both halves and smoke-tests the Docker Compose stack.
 - **Containers**: Docker Compose runs the API and an nginx-served frontend behind one port.
-- **Storage**: local sample audio files (demo) with optional user upload in future.
+- **Storage**: a bundled sample audio file (see `Content/Samples/README.md`).
 
 ## Deployment (free-tier first)
 ### Default recommendation
@@ -47,9 +47,9 @@
 - CORS must be enabled for the hosted frontend.
 
 ## Mapping to requirements and showcase concepts
-- **Pitch/tempo control**: .NET processing layer using NAudio + custom logic.
+- **Pitch/tempo control**: NAudio decoding and SoundTouch.Net time-stretching/pitch-shifting behind `IAudioProcessor`.
 - **Waveform analyzer**: WaveSurfer.js decoding + Web Audio `AnalyserNode` for dominant-frequency colouring, drawn on a Canvas in Angular.
-- **Performance**: OnPush, RxJS throttle/debounce, async streaming.
+- **Performance**: OnPush, debounced slider input, async streaming.
 - **Metadata**: `/api/audio/metadata` provides source/processed durations for tempo-aware UI.
 - **SOLID/DIP**: `IAudioProcessor` and `IAudioStreamService` interfaces.
-- **Networking awareness**: chunked HTTP streaming now; UDP/RTP discussion for future improvements.
+- **Networking**: chunked HTTP streaming of MP3; real-time transports such as UDP/RTP are outside the scope of this demo.
