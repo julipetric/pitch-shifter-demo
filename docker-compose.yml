@@ -1,0 +1,25 @@
+# Serves the whole app on http://localhost:8080
+#   docker compose up --build
+services:
+  backend:
+    build:
+      context: ./backend
+      target: runtime
+    # Reachable only from the frontend container; nothing is published on the host.
+    expose:
+      - "8080"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Empty: the browser calls the origin that served the page and nginx forwards to the backend.
+        AUDIO_API_BASE_URL: ""
+    ports:
+      - "${APP_PORT:-8080}:80"
+    environment:
+      BACKEND_UPSTREAM: backend:8080
+    depends_on:
+      - backend
+    restart: unless-stopped
