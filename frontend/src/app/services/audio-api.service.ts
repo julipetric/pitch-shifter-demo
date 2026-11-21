@@ -48,6 +48,11 @@ export class AudioApiService {
     return url.toString();
   }
 
+  /** Interactive API reference (Swagger UI) served by the backend. */
+  buildDocsUrl(): string {
+    return this.endpoint('/swagger').toString();
+  }
+
   /** Source and processed durations for the given parameters; `null` when the request fails. */
   getMetadata$(params: AudioProcessingParams): Observable<AudioMetadataDto | null> {
     const url = this.endpoint('/api/audio/metadata');

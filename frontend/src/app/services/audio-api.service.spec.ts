@@ -110,6 +110,16 @@ describe('AudioApiService', () => {
     });
   });
 
+  describe('docs URL', () => {
+    it('points at the Swagger UI next to the API', () => {
+      expect(createService('https://api.example.com/').buildDocsUrl()).toBe('https://api.example.com/swagger');
+    });
+
+    it('targets the page origin when the base URL is empty', () => {
+      expect(createService('').buildDocsUrl()).toBe(`${window.location.origin}/swagger`);
+    });
+  });
+
   describe('metadata', () => {
     let http: HttpTestingController;
 

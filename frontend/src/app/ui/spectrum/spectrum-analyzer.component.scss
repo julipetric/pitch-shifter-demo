@@ -1,0 +1,40 @@
+// Fills the width of its host. The height comes from --spectrum-height, which the layout
+// around the spectrum sets on any ancestor.
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.canvas {
+  display: block;
+  width: 100%;
+  height: var(--spectrum-height, 72px);
+}
+
+// The labels share one grid cell, so the axis is one line of text tall; each label is then
+// offset to the position of its frequency on the scale.
+.axis {
+  display: grid;
+  margin-top: var(--space-1);
+  color: var(--c-text-faint);
+  font-family: var(--font-text);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.axis-label {
+  position: relative;
+  grid-area: 1 / 1;
+  justify-self: start;
+  transform: translateX(-50%);
+
+  &[data-anchor='start'] {
+    transform: none;
+  }
+
+  &[data-anchor='end'] {
+    transform: translateX(-100%);
+  }
+}

@@ -19,8 +19,10 @@ flowchart LR
 
 ## Core components
 ### Frontend (Angular)
-- **Player UI** (`AppComponent`): play/pause, seek, volume, tempo/pitch sliders, preserve-pitch toggle. Tempo changes are debounced (300 ms) before the stream is reloaded.
-- **Waveform UI** (`WaveformSnippetComponent`): two instances, original and processed. WaveSurfer.js loads and decodes the stream (Web Audio `decodeAudioData`) and draws bars on a canvas; `WaveformFrequencyService` computes a dominant frequency per time segment with an FFT (`OfflineAudioContext` + `AnalyserNode`) and the bars are coloured by it.
+- **Player UI** (`AppComponent`): owns the `<audio>` element and the playback state; lays out the stage (track, live spectrum, waveforms, transport) and the deck (tempo and pitch knobs, preserve-pitch toggle, presets), side by side on wide screens; handles keyboard shortcuts, with a reference card in `ShortcutsDialogComponent`, and connection/buffering states. Tempo and seek changes are debounced (300 ms) before the stream is reloaded; pitch releases and presets apply at once.
+- **Controls** (`KnobComponent`, `music/presets.ts`, `music/intervals.ts`): rotary controls following the WAI-ARIA slider pattern, presets that set all parameters at once, and musical readouts (interval names, speed multipliers).
+- **Waveform UI** (`WaveformViewComponent`): two instances, original and processed, each showing its whole track. WaveSurfer.js loads and decodes the stream (Web Audio `decodeAudioData`) and draws bars on a canvas; `WaveformFrequencyService` computes a dominant frequency per time segment with an FFT (`OfflineAudioContext` + `AnalyserNode`) and the bars take its colour on the spectral scale (`visual/spectral-palette.ts`). The playhead arrives as the `--wf-progress` CSS custom property, written per frame outside Angular's zone.
+- **Live analysis** (`AudioAnalysisService`, `SpectrumAnalyzerComponent`, `StageLightDirective`): on the first Play the `<audio>` element is routed through an `AnalyserNode`; the spectrum draws 48 log-spaced bands and the stage light tints a glow behind the stage with the dominant frequency.
 - **Audio API wiring** (`AudioApiService`, `AudioFacadeService`): the service builds `/api/audio/stream` URLs with processing params and fetches `/api/audio/metadata`; the facade holds the current parameters and exposes the metadata as an observable.
 - **API base URL**: a build-time constant, empty by default so calls go to the origin that served the page.
 
@@ -66,7 +68,7 @@ flowchart TD
 
 ## Non-functional considerations
 - **Latency**: chunked streaming, small buffers, async I/O.
-- **Performance**: debounced slider events (RxJS).
+- **Performance**: debounced control events (RxJS); animation loops outside Angular's zone that stop when playback stops; OnPush components with signal inputs.
 - **Scalability**: stateless API, no in-memory session state.
 - **Reliability**: if the source cannot be opened for processing, the original file is streamed; if no usable sample exists, a generated tone is served (configurable).
 

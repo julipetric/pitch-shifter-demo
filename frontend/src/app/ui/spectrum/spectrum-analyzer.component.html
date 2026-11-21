@@ -1,0 +1,11 @@
+<canvas
+  #canvas
+  class="canvas"
+  role="img"
+  aria-label="Live frequency spectrum, low to high: violet to gold"
+></canvas>
+<div class="axis">
+  @for (label of axisLabels; track label.text) {
+    <span class="axis-label" [attr.data-anchor]="label.anchor" [style.left.%]="label.left">{{ label.text }}</span>
+  }
+</div>

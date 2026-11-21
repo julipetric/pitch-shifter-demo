@@ -1,0 +1,49 @@
+// The host is the popover. The browser's popover styles place it fixed in the middle of the
+// viewport (inset 0, auto margins) and hide it while closed, so the host never sets `display`.
+:host {
+  width: min(420px, calc(100vw - 32px));
+  margin: auto;
+  padding: var(--space-5);
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--radius-l);
+  background: var(--c-surface-2);
+  color: var(--c-text);
+  box-shadow: 0 32px 64px -24px rgb(0 0 0 / 0.7);
+}
+
+:host::backdrop {
+  background: rgb(8 8 12 / 0.55);
+}
+
+.title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--fs-lg);
+}
+
+.list {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-4) 0;
+
+  > div {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  dt {
+    color: var(--c-text-faint);
+  }
+
+  dd {
+    margin: 0;
+    color: var(--c-text-dim);
+  }
+}
+
+.note {
+  font-size: var(--fs-sm);
+  color: var(--c-text-faint);
+}

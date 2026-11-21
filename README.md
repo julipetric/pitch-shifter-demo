@@ -2,29 +2,40 @@
 
 [![CI](https://github.com/julipetric/pitch-shifter-demo/actions/workflows/ci.yml/badge.svg)](https://github.com/julipetric/pitch-shifter-demo/actions/workflows/ci.yml)
 
-Change the pitch and tempo of a track on the server while it streams, and watch the original and
-processed waveforms side by side in the browser. Angular 19 + ASP.NET Core 8, one `docker compose up` away.
+Change the pitch and tempo of a track on the server while it streams, and see what the processing does:
+the original and processed waveforms one above the other, coloured by frequency, under a live
+spectrum that lights the stage. Angular 19 + ASP.NET Core 8, one `docker compose up` away.
 
-![Pitch Shifter Demo: original and processed waveforms with tempo at 80% and pitch raised seven semitones](docs/images/hero.png)
+![Pitch Shifter playing at 90% tempo, a perfect fifth up: the original and processed waveforms coloured by frequency, the live spectrum, and the tempo and pitch knobs beside them](docs/images/hero.png)
 
 <details>
 <summary>Animated walkthrough</summary>
 
-![Playing the track, then lowering the tempo and raising the pitch while the processed waveform appears](docs/images/demo.gif)
+![Playing the track and picking the Chipmunk and Slow motion presets: the knobs turn, the server processes the track and the processed waveform takes the colours of its new pitch](docs/images/demo.gif)
+
+The waits for the server are sped up four times.
 
 </details>
 
 ## Features
 
-- **Tempo 50 to 125 % and pitch -12 to +12 semitones** (half-semitone steps), adjusted from sliders.
-  With *Preserve pitch* on, tempo and pitch are independent; with it off, tempo behaves like a
-  playback-rate change and the pitch follows.
+- **Tempo 50 to 125 % and pitch -12 to +12 semitones** (half-semitone steps), from two rotary knobs:
+  drag, scroll or use the arrow keys, double-click to reset. The pitch knob names the interval
+  ("Perfect fifth up"). With *Preserve pitch* off, tempo behaves like a tape speed change and the pitch
+  knob shows the shift it causes.
+- **Presets** for the classic effects (slow motion, chipmunk, giant, nightcore, practice speed), each
+  applied in one step without losing the playback position.
 - **Processing on the server.** The API time-stretches and pitch-shifts with SoundTouch, encodes the
   result to MP3 with LAME and streams it while it is being produced.
-- **Waveform comparison.** Original and processed audio are drawn side by side. Each bar is coloured by
-  the dominant frequency of its time segment (a chunked FFT in the browser), and a cursor follows
-  playback.
-- **Seek, volume and duration display.** Seeking a processed stream restarts it at the requested
+- **Colour is frequency.** Waveform bars are coloured by the dominant frequency of their time segment
+  (a chunked FFT in the browser) on a logarithmic violet-to-gold scale, so raising the pitch visibly
+  brightens the processed waveform. Both views show the whole track, aligned by musical position;
+  click either one to seek.
+- **Live spectrum and stage light.** A Web Audio analyser drives a 48-band spectrum, which doubles as
+  the colour legend, and a glow behind the stage tinted by the frequency that dominates what is playing.
+- **Keyboard first.** Space or K to play, arrows to seek, `[` `]` for pitch, `-` `+` for tempo, 1–6
+  for presets; `?` lists them all. Every control has an accessible name and value.
+- **Seek, volume, mute and duration display.** Seeking a processed stream restarts it at the requested
   offset; the metadata endpoint reports the processed duration for the chosen tempo.
 - **Self-contained fallback.** If no sample is available the API serves a generated 5-second 440 Hz tone.
 - **Stateless API** with centrally validated parameters and an `IAudioProcessor` abstraction around the
@@ -35,8 +46,9 @@ processed waveforms side by side in the browser. Angular 19 + ASP.NET Core 8, on
 ```mermaid
 flowchart LR
   subgraph Browser
-    UI["Angular app<br/>transport + tempo/pitch controls"]
+    UI["Angular app<br/>transport, knobs, presets"]
     WF["Waveform views<br/>WaveSurfer.js + Web Audio API"]
+    AN["Live spectrum + stage light<br/>Web Audio AnalyserNode"]
   end
 
   subgraph Server["Docker Compose"]
@@ -49,6 +61,7 @@ flowchart LR
 
   UI -->|"stream / metadata URLs"| NGINX
   WF -->|"same stream URLs"| NGINX
+  UI -->|"playing audio"| AN
   NGINX -->|"/api, /health, /diagnostics"| API
   API --> SVC
   SVC -->|"neutral tempo and pitch: file + range"| FILES
@@ -59,13 +72,14 @@ flowchart LR
 
 1. The browser loads the Angular bundle from nginx and calls the API on the same origin.
 2. `AudioApiService` builds `/api/audio/stream?...` and `/api/audio/metadata?...` URLs from the current
-   tempo, pitch and preserve-pitch values. Tempo changes are debounced and pitch changes apply when the
-   slider is released; either one reloads the stream.
+   tempo, pitch and preserve-pitch values. Tempo changes are debounced; pitch changes and presets apply
+   when the knob is released or the preset picked. Each change reloads the stream.
 3. For neutral parameters the API serves the sample file as it is, with range support. Otherwise
    `AudioStreamService` decodes the sample, `SoundTouchAudioProcessor` processes and encodes it on a
    background task, and the HTTP response reads from a pipe, so bytes flow while encoding continues.
-4. The `<audio>` element plays the stream; two WaveSurfer.js views load the original and the processed
-   stream, and `WaveformFrequencyService` colours the bars.
+4. The `<audio>` element plays the stream through a Web Audio analyser that feeds the live spectrum and
+   the stage light. Two WaveSurfer.js views load the whole original and processed tracks, and
+   `WaveformFrequencyService` colours their bars.
 
 More detail: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/STACK.md](docs/STACK.md).
 
@@ -79,7 +93,8 @@ cd pitch-shifter-demo
 docker compose up --build
 ```
 
-Open <http://localhost:8080>, press **Play**, then move the **Tempo** and **Pitch** sliders. Use
+Open <http://localhost:8080>, press **Play**, then turn the **Tempo** and **Pitch** knobs or pick a preset.
+Press `?` for the keyboard shortcuts. Use
 `APP_PORT=9000 docker compose up --build` for another host port, and `docker compose down` to stop.
 
 Swagger UI is at <http://localhost:8080/swagger>.
@@ -150,9 +165,21 @@ Configuration keys (`Audio:*`, `Cors:AllowedOrigins`, `Swagger:Enabled`, ...) ar
   codec.
 - **Swappable processing.** `IAudioProcessor` separates the HTTP layer and `AudioStreamService` from
   SoundTouch, so another algorithm can be plugged in.
-- **Responsive UI.** An `OnPush` waveform component, `@defer` for the waveform views, a debounced stream
-  reload, a facade service that cancels stale metadata requests with `switchMap`, and frequency analysis
-  that works in small chunks, yields to the main thread between them and can be aborted.
+- **Animation without change detection.** The playhead, the spectrum and the stage light run in
+  `requestAnimationFrame` loops outside Angular's zone. The playhead reaches the waveforms as CSS custom
+  properties mapped to a compositor-only `transform`; the loops stop once playback stops and the visuals
+  settle.
+- **Responsive UI.** `OnPush` components with signal inputs, `@defer` for the waveform views, a debounced
+  stream reload that never drops a change, a facade service that cancels stale metadata requests with
+  `switchMap`, and frequency analysis that works in small chunks, yields to the main thread between them
+  and can be aborted.
+- **One colour scale for sound.** `spectral-palette.ts` maps 50 Hz–10 kHz logarithmically onto an
+  OKLab-interpolated scale whose lightness rises with frequency (a unit test guards it), precomputed
+  into a lookup table for the canvases. Interface chrome stays neutral, so colour always means
+  frequency.
+- **Accessible custom controls.** The knobs implement the WAI-ARIA slider pattern (arrows, Page Up/Down,
+  Home/End) with spoken values such as "plus 7 semitones, perfect fifth up"; seek and volume are native
+  range inputs; focus is always visible and reduced motion is respected.
 - **Same origin by default.** The production bundle uses an empty API base URL, resolved against the
   page origin, and nginx proxies the API, so no CORS setup is needed. Another origin is a build-time
   setting (`AUDIO_API_BASE_URL`) plus `Cors:AllowedOrigins` on the API.
@@ -191,7 +218,10 @@ the shell, the proxied API and a processed MP3 stream.
 ├── frontend/                              Angular 19 app (Angular Material, WaveSurfer.js)
 │   ├── Dockerfile
 │   ├── nginx/default.conf.template        static hosting + API proxy
-│   └── src/app/                           components, services, pipes, waveform, specs
+│   └── src/
+│       ├── styles.scss                    design tokens, Material theme
+│       └── app/                           shell, ui/ (knob, spectrum, stage light), waveform/,
+│                                          services/, music/ (intervals, presets), visual/ (palette)
 ├── docs/                                  architecture, stack, setup, deployment, images
 ├── openspec/                              specifications and archived change proposals
 ├── scripts/                               developer environment bootstrap (PowerShell, bash)

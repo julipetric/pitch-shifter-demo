@@ -10,6 +10,7 @@
           "skipTests": true
         },
         "@schematics/angular:component": {
+          "style": "scss",
           "skipTests": true
         },
         "@schematics/angular:directive": {
@@ -51,9 +52,13 @@
                 "input": "public"
               }
             ],
+            "inlineStyleLanguage": "scss",
             "styles": [
-              "@angular/material/prebuilt-themes/azure-blue.css",
-              "src/styles.css"
+              "node_modules/@fontsource-variable/oxanium/index.css",
+              "node_modules/@fontsource/barlow/400.css",
+              "node_modules/@fontsource/barlow/500.css",
+              "node_modules/@fontsource/barlow/600.css",
+              "src/styles.scss"
             ],
             "scripts": []
           },
@@ -73,8 +78,8 @@
                 },
                 {
                   "type": "anyComponentStyle",
-                  "maximumWarning": "2kB",
-                  "maximumError": "4kB"
+                  "maximumWarning": "8kB",
+                  "maximumError": "16kB"
                 }
               ],
               "outputHashing": "all",
@@ -120,9 +125,13 @@
                 "input": "public"
               }
             ],
+            "inlineStyleLanguage": "scss",
             "styles": [
-              "@angular/material/prebuilt-themes/azure-blue.css",
-              "src/styles.css"
+              "node_modules/@fontsource-variable/oxanium/index.css",
+              "node_modules/@fontsource/barlow/400.css",
+              "node_modules/@fontsource/barlow/500.css",
+              "node_modules/@fontsource/barlow/600.css",
+              "src/styles.scss"
             ],
             "scripts": []
           }

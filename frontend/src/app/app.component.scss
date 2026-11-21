@@ -1,0 +1,590 @@
+// Layout: a "stage" (the screen: track, live spectrum, both waveforms, transport) and a
+// "deck" (the faceplate: tempo and pitch knobs, pitch mode, presets). The deck is a side
+// column on wide screens and sits under the stage below 1180px.
+
+:host {
+  display: block;
+  --gutter: clamp(16px, 3vw, 32px);
+  --wf-height: clamp(72px, 18vh, 184px);
+}
+
+.app {
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+}
+
+// Top bar, content and footer share one centred column.
+.topbar,
+.layout,
+.footer {
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
+// ---- Top bar ---------------------------------------------------------------------------
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--gutter);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand-mark {
+  width: 30px;
+  height: 30px;
+  flex: none;
+}
+
+.brand-tile {
+  fill: var(--c-surface-2);
+  stroke: var(--c-line-strong);
+  stroke-width: 1;
+}
+
+.brand-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--fs-lg);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.server-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  color: var(--c-text-dim);
+  white-space: nowrap;
+}
+
+.server-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--c-text-faint);
+
+  [data-state='online'] & {
+    background: var(--c-online);
+    box-shadow: 0 0 0 3px rgb(110 231 183 / 0.16);
+  }
+
+  [data-state='offline'] & {
+    background: var(--c-offline);
+    box-shadow: 0 0 0 3px rgb(255 122 122 / 0.16);
+  }
+}
+
+// The shortcuts button gives way on touch screens, where there is no keyboard to press
+// them, and on narrow windows, where `?` still opens the list.
+@media (hover: none), (max-width: 520px) {
+  .shortcuts-button {
+    display: none;
+  }
+}
+
+// ---- Page layout -----------------------------------------------------------------------
+
+.layout {
+  display: grid;
+  align-content: start;
+  gap: var(--space-5);
+  padding: var(--space-2) var(--gutter) var(--space-6);
+}
+
+// On wide screens the deck becomes a side column, so the knobs and the waveforms they change
+// are always in view together.
+@media (min-width: 1180px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr) clamp(336px, 25vw, 384px);
+    align-items: stretch;
+  }
+}
+
+// ---- Stage -----------------------------------------------------------------------------
+
+.stage-wrap {
+  position: relative;
+  isolation: isolate;
+}
+
+// The glow sits behind the opaque stage and spills past its edges, like bias lighting behind
+// a monitor, tinted by the frequency that dominates what is playing. StageLightDirective
+// writes --stage-glow and --stage-glow-level on this empty element, so the per-frame style
+// changes never cascade into the stage; level changes only touch the composited opacity.
+.stage-glow {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: var(--radius-l);
+  pointer-events: none;
+  box-shadow: 0 0 110px 6px var(--stage-glow, #ef5395);
+  opacity: calc(0.05 + var(--stage-glow-level, 0) * 0.55);
+  will-change: opacity;
+}
+
+.stage {
+  display: grid;
+  gap: var(--space-5);
+  padding: clamp(16px, 2.2vw, 28px);
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-l);
+  background: var(--c-surface);
+}
+
+.stage-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(240px, 30%, 380px);
+  align-items: end;
+  gap: var(--space-5);
+}
+
+.track {
+  min-width: 0;
+}
+
+.track-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: clamp(1.75rem, 3vw, 2.625rem);
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+}
+
+.track-credit {
+  margin-top: var(--space-2);
+  max-width: 60ch;
+  color: var(--c-text-dim);
+}
+
+.spectrum {
+  display: grid;
+  gap: var(--space-2);
+  --spectrum-height: 52px;
+}
+
+.notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid rgb(255 122 122 / 0.35);
+  border-radius: var(--radius-m);
+  background: rgb(255 122 122 / 0.06);
+  font-size: var(--fs-sm);
+
+  code {
+    font-family: inherit;
+    font-weight: 600;
+  }
+}
+
+// ---- Waveform lanes --------------------------------------------------------------------
+
+.lanes {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.lane {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.lane-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  min-height: 22px;
+}
+
+.lane-title {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.lane-summary {
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  color: var(--c-text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.lane-time {
+  margin-left: auto;
+  font-family: var(--font-display);
+  font-size: var(--fs-sm);
+  color: var(--c-text-faint);
+}
+
+.lane-placeholder,
+.lane-empty {
+  display: grid;
+  place-items: center;
+  height: var(--wf-height);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-m);
+  color: var(--c-text-dim);
+  font-size: var(--fs-sm);
+  text-align: center;
+}
+
+.lane-placeholder {
+  border: 1px solid var(--c-line);
+  background: var(--c-bg);
+}
+
+// Hatching marks the lane as empty until processing is switched on.
+.lane-empty {
+  border: 1px dashed var(--c-line-strong);
+  background: repeating-linear-gradient(
+    135deg,
+    transparent 0 10px,
+    rgb(255 255 255 / 0.018) 10px 20px
+  );
+}
+
+// ---- Transport -------------------------------------------------------------------------
+
+.transport {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--c-line);
+}
+
+.play-button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--c-text);
+  color: var(--c-bg);
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-med) var(--ease-out);
+
+  svg {
+    width: 24px;
+    height: 24px;
+    fill: currentColor;
+  }
+
+  &:hover {
+    transform: scale(1.04);
+    box-shadow: 0 0 0 6px rgb(242 241 247 / 0.08);
+  }
+
+  &:active {
+    transform: scale(0.96);
+  }
+
+  // A turning arc while the stream buffers or the server processes.
+  &.is-busy::after {
+    content: '';
+    position: absolute;
+    inset: -5px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    border-top-color: var(--c-text);
+    border-right-color: rgb(242 241 247 / 0.35);
+    animation: spin 0.9s linear infinite;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.timecode {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  font-family: var(--font-display);
+  white-space: nowrap;
+}
+
+.timecode-current {
+  font-size: var(--fs-xl);
+  font-weight: 600;
+}
+
+.timecode-total {
+  font-size: var(--fs-md);
+  color: var(--c-text-faint);
+
+  &::before {
+    content: '/';
+    margin-right: var(--space-2);
+  }
+}
+
+.volume {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.volume-slider {
+  width: 96px;
+}
+
+// ---- Deck (faceplate) ------------------------------------------------------------------
+
+.deck {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  padding: clamp(16px, 2vw, 24px) 0;
+  border: 1px solid var(--c-line);
+  border-top-color: #34344a;
+  border-radius: var(--radius-l);
+  background: linear-gradient(180deg, #1b1b25, #16161e 70%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.04),
+    0 24px 48px -32px rgb(0 0 0 / 0.8);
+}
+
+.deck-section {
+  min-width: 0;
+  padding: 0 clamp(16px, 2.2vw, 28px);
+
+  & + & {
+    margin-top: clamp(16px, 2.6vh, 24px);
+    padding-top: clamp(16px, 2.6vh, 24px);
+    border-top: 1px solid var(--c-line);
+  }
+}
+
+.deck-knobs {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-around;
+  gap: var(--space-4);
+}
+
+.deck-mode {
+  display: grid;
+  align-content: center;
+  gap: var(--space-2);
+}
+
+.hint {
+  font-size: var(--fs-sm);
+  color: var(--c-text-dim);
+  max-width: 40ch;
+}
+
+.deck-presets {
+  display: grid;
+  align-content: center;
+  gap: var(--space-3);
+}
+
+.preset-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.preset {
+  position: relative;
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-s);
+  background: var(--c-surface-2);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
+
+  &:hover {
+    border-color: var(--c-line-strong);
+    background: var(--c-surface-3);
+  }
+
+  &:active {
+    transform: translateY(1px);
+  }
+
+  &[aria-pressed='true'] {
+    border-color: rgb(242 241 247 / 0.55);
+    background: var(--c-surface-3);
+  }
+}
+
+// An indicator light in the colour of the preset's pitch, lit while the preset is active.
+.preset-led {
+  position: absolute;
+  top: 14px;
+  right: 12px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--c-line-strong);
+  transition: background-color var(--dur-med) var(--ease-out), box-shadow var(--dur-med) var(--ease-out);
+
+  [aria-pressed='true'] > & {
+    background: var(--led);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--led) 22%, transparent), 0 0 12px var(--led);
+  }
+}
+
+.preset-name {
+  padding-right: 14px;
+  font-weight: 600;
+  font-size: var(--fs-md);
+  line-height: 1.2;
+}
+
+.preset-detail {
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  color: var(--c-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+// ---- Footer ----------------------------------------------------------------------------
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-5);
+  padding: var(--space-4) var(--gutter) var(--space-6);
+  color: var(--c-text-faint);
+  font-size: var(--fs-sm);
+
+  cite {
+    font-style: normal;
+    color: var(--c-text-dim);
+  }
+}
+
+.footer-links {
+  display: flex;
+  gap: var(--space-5);
+
+  a {
+    color: var(--c-text-dim);
+    text-decoration: none;
+    text-underline-offset: 3px;
+
+    &:hover {
+      color: var(--c-text);
+      text-decoration: underline;
+    }
+  }
+}
+
+// ---- Responsive ------------------------------------------------------------------------
+
+@media (max-height: 760px) {
+  :host {
+    --knob-size: 96px;
+  }
+}
+
+// Tablets and narrow laptops: the deck sits under the stage as a horizontal faceplate.
+@media (min-width: 720px) and (max-width: 1179.98px) {
+  .deck {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .deck-knobs {
+    justify-content: flex-start;
+    gap: clamp(16px, 3vw, 40px);
+  }
+
+  // Beside the knobs, the mode section takes a vertical divider; the selector matches the
+  // specificity of the stacked divider rule above so this one replaces it.
+  .deck-knobs + .deck-mode {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+    border-left: 1px solid var(--c-line);
+  }
+
+  .deck-presets {
+    grid-column: 1 / -1;
+  }
+
+  .preset-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  :host {
+    --wf-height: 64px;
+  }
+
+  .spectrum {
+    --spectrum-height: 40px;
+  }
+
+  .stage-head {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .transport {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    row-gap: var(--space-2);
+  }
+
+  .seek {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .timecode-current {
+    font-size: var(--fs-lg);
+  }
+
+  .volume-slider {
+    width: 72px;
+  }
+
+  .notice {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 420px) {
+  .volume-slider {
+    display: none;
+  }
+}
