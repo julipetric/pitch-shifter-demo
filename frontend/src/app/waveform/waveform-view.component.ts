@@ -21,8 +21,8 @@ const BAR_RADIUS = 1;
   selector: 'app-waveform-snippet',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  templateUrl: './waveform-snippet.component.html',
-  styleUrl: './waveform-snippet.component.css',
+  templateUrl: './waveform-view.component.html',
+  styleUrl: './waveform-view.component.scss',
   providers: [WaveformFrequencyService],
 })
 export class WaveformSnippetComponent implements OnChanges, OnDestroy, AfterViewInit {
