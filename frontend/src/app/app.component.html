@@ -1,125 +1,270 @@
-<mat-toolbar color="primary">
-  <span>{{ title }}</span>
-</mat-toolbar>
-<main>
-  <mat-card class="transport-card">
-    <mat-card-header>
-      <mat-card-title>Audio Transport</mat-card-title>
-      <mat-card-subtitle>Streaming from backend</mat-card-subtitle>
-    </mat-card-header>
-    <mat-card-content>
-      <div class="controls">
-        <button mat-raised-button color="primary" (click)="togglePlay()">
-          {{ isPlaying ? 'Pause' : 'Play' }}
-        </button>
-      </div>
+<div class="app" [class.is-playing]="isPlaying">
+  <header class="topbar">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+        <rect width="32" height="32" rx="8" class="brand-tile" />
+        <g stroke-linecap="round" stroke-width="3.2">
+          <path d="M7 14.5v3" stroke="var(--spectral-0)" />
+          <path d="M11.5 12v8" stroke="var(--spectral-1)" />
+          <path d="M16 9.5v13" stroke="var(--spectral-2)" />
+          <path d="M20.5 7.5v17" stroke="var(--spectral-3)" />
+          <path d="M25 5.5v21" stroke="var(--spectral-4)" />
+        </g>
+      </svg>
+      <span class="brand-name">{{ title }}</span>
+    </div>
 
-      <div class="slider-group">
-        <label class="slider-label" for="seek-slider">Seek</label>
-        <mat-slider [min]="0" [max]="duration" [step]="0.1" [disabled]="duration === 0">
+    <div class="topbar-actions">
+      <button type="button" class="ghost-button shortcuts-button" popovertarget="shortcuts" aria-haspopup="dialog">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="2.5" y="6" width="19" height="12" rx="2.5" />
+          <path d="M6.5 10h1M10 10h1M13.5 10h1M17 10h.5M7.5 14h9" />
+        </svg>
+        Shortcuts
+      </button>
+      <span class="server-status" [attr.data-state]="serverState" role="status">
+        <span class="server-dot" aria-hidden="true"></span>
+        @switch (serverState) {
+          @case ('online') { Server online }
+          @case ('offline') { Server offline }
+          @default { Connecting… }
+        }
+      </span>
+    </div>
+  </header>
+
+  <main class="layout">
+    <div class="stage-wrap">
+      <div class="stage-glow" [appStageLight]="isPlaying" aria-hidden="true"></div>
+      <section class="stage" aria-labelledby="track-title">
+        <div class="stage-head">
+          <div class="track">
+            <h1 id="track-title" class="track-title">{{ track.title }}</h1>
+            <p class="track-credit">{{ track.credit }}</p>
+          </div>
+          <div class="spectrum">
+            <h2 class="section-label">Live spectrum</h2>
+            <app-spectrum-analyzer [analyser]="analyser()" [active]="isPlaying" />
+          </div>
+        </div>
+
+        @if (serverState === 'offline' || hasStreamError) {
+          <div class="notice" role="alert">
+            <p>
+              The audio server isn't responding. Start the API (or <code>docker compose up</code>), then try again.
+            </p>
+            <button type="button" class="ghost-button" (click)="retryConnection()">Try again</button>
+          </div>
+        }
+
+        <div class="lanes" #lanes>
+          <div class="lane">
+            <div class="lane-head">
+              <h2 class="lane-title">Original</h2>
+              <span class="lane-time">{{ sourceDuration | formatTime }}</span>
+            </div>
+            @defer (on idle) {
+              <app-waveform-view
+                style="--wf-progress: var(--p-original)"
+                [src]="originalWaveformUrl"
+                [durationSeconds]="sourceDuration"
+                ariaLabel="Original waveform, coloured by dominant frequency"
+                (seek)="seekToFraction($event)"
+              />
+            } @placeholder {
+              <div class="lane-placeholder">Loading waveform…</div>
+            }
+          </div>
+
+          <div class="lane">
+            <div class="lane-head">
+              <h2 class="lane-title">Processed</h2>
+              @if (isProcessingActive) {
+                <span class="lane-summary">{{ processingSummary }}</span>
+                @if (metadata$ | async; as meta) {
+                  <span class="lane-time">{{ meta.processedDurationSeconds | formatTime }}</span>
+                }
+              }
+            </div>
+            @if (!isProcessingActive) {
+              <div class="lane-empty">Turn a knob or pick a preset to hear the processed version.</div>
+            } @else if (processedWaveformUrl) {
+              @defer (on idle) {
+                <app-waveform-view
+                  style="--wf-progress: var(--p-processed)"
+                  [src]="processedWaveformUrl"
+                  [durationSeconds]="duration"
+                  [deferColoring]="true"
+                  loadingLabel="Processing on the server…"
+                  ariaLabel="Processed waveform, coloured by dominant frequency"
+                  (seek)="seekToFraction($event)"
+                />
+              } @placeholder {
+                <div class="lane-placeholder">Loading processed waveform…</div>
+              }
+            } @else {
+              <div class="lane-placeholder">Loading processed waveform…</div>
+            }
+          </div>
+        </div>
+
+        <div class="transport">
+          <button
+            type="button"
+            class="play-button"
+            [class.is-busy]="isBuffering && !hasStreamError"
+            [attr.aria-label]="isPlaying ? 'Pause' : 'Play'"
+            (click)="togglePlay()"
+          >
+            @if (isPlaying) {
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="5" width="4" height="14" rx="1.2" /><rect x="13.5" y="5" width="4" height="14" rx="1.2" /></svg>
+            } @else {
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.6v12.8a1 1 0 0 0 1.5.86l10.4-6.4a1 1 0 0 0 0-1.72L9.5 4.74A1 1 0 0 0 8 5.6Z" /></svg>
+            }
+          </button>
+
+          <div class="timecode">
+            <span class="timecode-current">{{ currentTime | formatTime }}</span>
+            <span class="timecode-total">{{ duration | formatTime }}</span>
+          </div>
+
           <input
-            matSliderThumb
-            id="seek-slider"
+            class="range seek"
+            type="range"
+            min="0"
+            [max]="duration"
+            step="0.1"
             [value]="seekValue"
+            [disabled]="duration === 0"
+            [style.--fill]="seekFraction"
+            aria-label="Seek"
+            [attr.aria-valuetext]="(currentTime | formatTime) + ' of ' + (duration | formatTime)"
             (input)="onSeekInput($event)"
             (change)="onSeekCommit($event)"
           />
-        </mat-slider>
-        <div class="time">
-          {{ currentTime | formatTime }} / {{ duration | formatTime }}
-          @if (metadata$ | async; as meta) {
-            <div class="meta">
-              Source: {{ meta.sourceDurationSeconds | formatTime }}
-              <span class="separator">•</span>
-              Processed (API): {{ meta.processedDurationSeconds | formatTime }}
-            </div>
-          } @else {
-            <div class="meta meta-loading">Loading metadata…</div>
+
+          <div class="volume">
+            <button
+              type="button"
+              class="icon-button"
+              [attr.aria-label]="isMuted ? 'Unmute' : 'Mute'"
+              [matTooltip]="isMuted ? 'Unmute (M)' : 'Mute (M)'"
+              (click)="toggleMute()"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path class="speaker" d="M4 9.5h3.2L12 5.5v13l-4.8-4H4z" />
+                @if (isMuted || volume === 0) {
+                  <path d="m16 9.5 5 5m0-5-5 5" />
+                } @else {
+                  <path d="M15.5 9a4.2 4.2 0 0 1 0 6" />
+                  @if (volume > 0.5) {
+                    <path d="M18 6.5a7.8 7.8 0 0 1 0 11" />
+                  }
+                }
+              </svg>
+            </button>
+            <input
+              class="range volume-slider"
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              [value]="effectiveVolume"
+              [style.--fill]="effectiveVolume"
+              aria-label="Volume"
+              (input)="onVolumeInput($event)"
+            />
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <section class="deck" aria-label="Processing">
+      <div class="deck-section deck-knobs">
+        <app-knob
+          label="Tempo"
+          [value]="tempoPercent"
+          [min]="tempoMin"
+          [max]="tempoMax"
+          [step]="1"
+          [largeStep]="5"
+          [neutral]="100"
+          [readout]="tempoReadout"
+          [caption]="tempoCaption"
+          [valueText]="tempoValueText"
+          (valueChange)="onTempoInput($event)"
+        />
+        <app-knob
+          label="Pitch"
+          [value]="pitchDisplayValue"
+          [min]="pitchMin"
+          [max]="pitchMax"
+          [step]="pitchStep"
+          [largeStep]="1"
+          [neutral]="0"
+          [readout]="pitchReadout"
+          [caption]="pitchCaption"
+          [valueText]="pitchValueText"
+          [accent]="pitchAccent"
+          [disabled]="!preservePitch"
+          (valueChange)="onPitchInput($event)"
+          (valueCommit)="onPitchCommit($event)"
+        />
+      </div>
+
+      <div class="deck-section deck-mode">
+        <mat-slide-toggle [checked]="preservePitch" (change)="onPreservePitchChange($event)">Preserve pitch</mat-slide-toggle>
+        <p class="hint">{{ preserveHint }}</p>
+      </div>
+
+      <div class="deck-section deck-presets" role="group" aria-labelledby="presets-title">
+        <h2 id="presets-title" class="section-label">Presets</h2>
+        <div class="preset-grid">
+          @for (preset of presets; track preset.id; let i = $index) {
+            <button
+              type="button"
+              class="preset"
+              [attr.aria-pressed]="activePresetId === preset.id"
+              [matTooltip]="preset.description + ' (' + (i + 1) + ')'"
+              [matTooltipShowDelay]="400"
+              [style.--led]="presetColor(preset)"
+              (click)="applyPreset(preset)"
+            >
+              <span class="preset-led" aria-hidden="true"></span>
+              <span class="preset-name">{{ preset.name }}</span>
+              <span class="preset-detail">{{ preset.detail }}</span>
+            </button>
           }
         </div>
       </div>
+    </section>
+  </main>
 
-      <div class="slider-group">
-        <label class="slider-label" for="volume-slider">Volume</label>
-        <mat-slider [min]="0" [max]="1" [step]="0.01">
-          <input matSliderThumb id="volume-slider" [value]="volume" (input)="onVolumeInput($event)" />
-        </mat-slider>
-      </div>
+  <footer class="footer">
+    <p>
+      Recording: <cite>Maple Leaf Rag</cite> by Scott Joplin, played by the U.S. Air Force Band. Public domain.
+    </p>
+    <nav class="footer-links" aria-label="Project links">
+      <a [href]="docsUrl" target="_blank" rel="noopener">API reference</a>
+      <a [href]="sourceCodeUrl" target="_blank" rel="noopener">Source code</a>
+    </nav>
+  </footer>
 
-      <div class="slider-group">
-        <label class="slider-label" for="tempo-slider">Tempo ({{ tempoPercent }}%)</label>
-        <mat-slider [min]="tempoMin" [max]="tempoMax" [step]="1">
-          <input matSliderThumb id="tempo-slider" [value]="tempoPercent" (input)="onTempoInput($event)" />
-        </mat-slider>
-      </div>
-
-      <div class="toggle-group">
-        <mat-slide-toggle [checked]="preservePitch" (change)="onPreservePitchChange($event)">
-          Preserve pitch
-        </mat-slide-toggle>
-      </div>
-
-      <div class="slider-group">
-        <label class="slider-label" for="pitch-slider">Pitch ({{ pitchSemitones }} st)</label>
-        <mat-slider [min]="pitchMin" [max]="pitchMax" [step]="pitchStep">
-          <input
-            matSliderThumb
-            id="pitch-slider"
-            [value]="pitchSemitones"
-            (input)="onPitchInput($event)"
-            (change)="onPitchCommit($event)"
-          />
-        </mat-slider>
-      </div>
-    </mat-card-content>
-  </mat-card>
-
-  <mat-card class="waveform-card">
-    <mat-card-header>
-      <mat-card-title>Waveform</mat-card-title>
-      <mat-card-subtitle>Original vs processed</mat-card-subtitle>
-    </mat-card-header>
-    <mat-card-content>
-      <div class="waveform-panel">
-        <div class="waveform-window">
-          <div class="waveform-label">Original</div>
-          @defer (on idle) {
-            <app-waveform-snippet [streamUrl]="originalStreamUrl" [progress]="originalProgress" />
-          } @placeholder {
-            <div class="waveform-placeholder">Loading waveform…</div>
-          }
-        </div>
-        <div class="waveform-window">
-          <div class="waveform-label">Processed</div>
-          @if (isProcessingActive) {
-            @defer (on idle) {
-              <app-waveform-snippet
-                [streamUrl]="streamUrl"
-                [progress]="processedProgress"
-                [deferColoring]="true"
-              />
-            } @placeholder {
-              <div class="waveform-placeholder">Loading processed waveform…</div>
-            }
-          } @else {
-            <div class="waveform-placeholder waveform-placeholder--disabled">
-              Adjust tempo or pitch to show processed waveform.
-            </div>
-          }
-        </div>
-      </div>
-    </mat-card-content>
-  </mat-card>
+  <app-shortcuts-dialog id="shortcuts" />
 
   <audio
     #audioRef
+    crossorigin="anonymous"
     [src]="streamUrl"
     preload="metadata"
     (play)="onPlay()"
     (pause)="onPause()"
     (ended)="onEnded()"
+    (waiting)="onWaiting()"
+    (playing)="onPlaying()"
+    (error)="onStreamError()"
     (timeupdate)="onTimeUpdate()"
     (loadedmetadata)="onLoadedMetadata()"
     (canplay)="onCanPlay()"
   ></audio>
-</main>
+</div>

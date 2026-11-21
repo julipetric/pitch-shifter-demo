@@ -1,0 +1,254 @@
+// Rotary encoder: label row, dial, readout and caption, stacked and centred.
+//
+// `--knob-size` sets the dial width (112px by default) and can be set on the element or any
+// ancestor. The readout and caption never widen the component: longer text overflows it,
+// centred, so values and captions changing never move the surrounding layout.
+
+:host {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  min-inline-size: calc(var(--knob-size, 112px) + 2 * var(--space-3));
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.label-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-block-end: var(--space-2);
+}
+
+.label {
+  font: 500 var(--fs-sm) / 1.4 var(--font-text);
+  color: var(--c-text-dim);
+  white-space: nowrap;
+}
+
+// Sits off the label's end, outside the flow, so the label stays centred whether it shows or not.
+.reset {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 100%;
+  translate: var(--space-1) -50%;
+  display: grid;
+  place-items: center;
+  inline-size: 24px;
+  block-size: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--c-text-faint);
+  cursor: pointer;
+  transition:
+    color var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out);
+  animation: reset-in var(--dur-med) var(--ease-out);
+
+  svg {
+    inline-size: 14px;
+    block-size: 14px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  &:hover,
+  &:focus-visible {
+    color: var(--c-text);
+    background: rgb(255 255 255 / 6%);
+  }
+
+  &:focus-visible {
+    outline-offset: 1px;
+  }
+}
+
+@keyframes reset-in {
+  from {
+    opacity: 0;
+    scale: 0.6;
+  }
+}
+
+.dial {
+  inline-size: var(--knob-size, 112px);
+  aspect-ratio: 10 / 9;
+  border-radius: var(--radius-m);
+  cursor: ns-resize;
+  touch-action: none;
+
+  // Keyboard focus shows as a ring around the cap, drawn inside the face.
+  &:focus-visible {
+    outline: none;
+  }
+}
+
+.face {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  overflow: visible;
+}
+
+.tick {
+  fill: none;
+}
+
+.tick-minor {
+  stroke: var(--c-text-faint);
+  stroke-opacity: 0.4;
+  stroke-width: 1;
+}
+
+.tick-end {
+  stroke: var(--c-text-faint);
+  stroke-opacity: 0.6;
+  stroke-width: 1.25;
+}
+
+.tick-neutral {
+  stroke: var(--c-text-dim);
+  stroke-width: 1.5;
+}
+
+.track,
+.value,
+.value-glow {
+  fill: none;
+  stroke-width: 3.2;
+  stroke-linecap: round;
+}
+
+.track {
+  stroke: var(--c-line-strong);
+}
+
+// The value arc, glow and pointer follow input directly: none of them transitions.
+.value,
+.value-glow {
+  stroke: var(--knob-accent, var(--c-text));
+}
+
+.value-glow {
+  stroke-width: 4.5;
+  opacity: 0.55;
+}
+
+.focus-ring {
+  fill: none;
+  stroke: var(--c-text);
+  stroke-width: 1.75;
+  opacity: 0;
+}
+
+.dial:focus-visible .focus-ring {
+  opacity: 1;
+}
+
+.cap-shadow {
+  fill: #000;
+  opacity: 0.6;
+}
+
+.cap {
+  transform-box: view-box;
+  transform-origin: 50px 50px;
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+:host(.is-dragging) .cap {
+  transform: scale(0.965);
+}
+
+.body-light {
+  stop-color: var(--c-surface-3);
+}
+
+.body-dark {
+  stop-color: var(--c-surface-2);
+}
+
+.cap-rim {
+  fill: none;
+  stroke-width: 1;
+  opacity: 0.7;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+
+.rim-light {
+  stop-color: #fff;
+  stop-opacity: 0.3;
+}
+
+.rim-dark {
+  stop-color: #fff;
+  stop-opacity: 0.02;
+}
+
+.pointer {
+  stroke: var(--c-text);
+  stroke-width: 2.6;
+  stroke-linecap: round;
+}
+
+.pointer-tip {
+  fill: var(--knob-accent, var(--c-text));
+}
+
+@media (hover: hover) {
+  .dial:hover .cap-rim {
+    opacity: 1;
+  }
+}
+
+.readout,
+.caption {
+  align-self: stretch;
+  display: flex;
+  justify-content: center;
+  contain: inline-size;
+  white-space: nowrap;
+}
+
+// Both lines keep a fixed height, so an empty or changing value never moves what follows.
+.readout {
+  block-size: 1.2em;
+  margin-block-start: var(--space-1);
+  font: 600 var(--fs-xl) / 1.2 var(--font-display);
+  color: var(--c-text);
+}
+
+.caption {
+  block-size: 1.4em;
+  font: 500 var(--fs-sm) / 1.4 var(--font-text);
+  color: var(--c-text-dim);
+}
+
+:host(.is-disabled) {
+  .dial {
+    cursor: default;
+    opacity: 0.4;
+  }
+
+  .label {
+    color: var(--c-text-faint);
+  }
+
+  .readout {
+    color: var(--c-text-dim);
+  }
+}
+
+// Forced-colours mode may flatten or repaint the face, so focus also shows as a system outline.
+@media (forced-colors: active) {
+  .dial:focus-visible {
+    outline: 2px solid CanvasText;
+    outline-offset: 2px;
+  }
+}

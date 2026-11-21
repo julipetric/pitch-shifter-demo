@@ -10,12 +10,14 @@
 ## Core stack
 ### Frontend (Angular)
 - **Angular + TypeScript**: component-based UI and strong typing.
-- **Angular Material**: component library for UI (buttons, sliders, cards, etc.).
-- **RxJS**: pitch/tempo slider changes are debounced (`debounceTime` + `distinctUntilChanged`) before a new stream is requested.
-- **Web Audio API**: `decodeAudioData` (via WaveSurfer.js) and `OfflineAudioContext` + `AnalyserNode` for waveform/frequency analysis.
+- **Angular Material**: the preserve-pitch slide toggle and tooltips, themed with `mat.theme` and mapped onto the app's design tokens.
+- **Design system**: CSS custom properties in `src/styles.scss` (SCSS), self-hosted Oxanium and Barlow fonts (`@fontsource`), and one spectral colour scale (`visual/spectral-palette.ts`) for everything derived from audio.
+- **Custom controls**: an SVG rotary knob implementing the WAI-ARIA slider pattern; styled native range inputs for seek and volume; the Popover API for the shortcut reference.
+- **RxJS**: tempo and seek changes are debounced (`switchMap` + `timer`, so every change that survives the delay is applied) before a new stream is requested.
+- **Web Audio API**: `decodeAudioData` (via WaveSurfer.js) and `OfflineAudioContext` + `AnalyserNode` for waveform/frequency analysis; a live `AnalyserNode` behind the `<audio>` element for the spectrum and the stage light.
 - **WaveSurfer.js**: loads and decodes the streams and renders the waveform on a canvas through a custom bar renderer.
-- **Canvas 2D**: waveform rendering.
-- **Performance patterns**: `ChangeDetectionStrategy.OnPush` on the waveform component, `@defer` for the waveform views, `async` pipe for metadata.
+- **Canvas 2D**: waveform and spectrum rendering.
+- **Performance patterns**: `ChangeDetectionStrategy.OnPush` and signal inputs on the presentational components, `@defer` for the waveform views, `async` pipe for metadata, `requestAnimationFrame` loops outside Angular's zone, and CSS custom properties driving compositor-only transforms for the playhead.
 
 ### Backend (.NET)
 - **ASP.NET Core Web Minimal API**: streaming endpoints and parameterized audio processing.
@@ -48,8 +50,8 @@
 
 ## Mapping to requirements and showcase concepts
 - **Pitch/tempo control**: NAudio decoding and SoundTouch.Net time-stretching/pitch-shifting behind `IAudioProcessor`.
-- **Waveform analyzer**: WaveSurfer.js decoding + Web Audio `AnalyserNode` for dominant-frequency colouring, drawn on a Canvas in Angular.
-- **Performance**: OnPush, debounced slider input, async streaming.
+- **Waveform analyzer**: WaveSurfer.js decoding + Web Audio `AnalyserNode` for dominant-frequency colouring, drawn on a Canvas in Angular; a live spectrum of the playing audio.
+- **Performance**: OnPush, debounced control input, animation outside the Angular zone, async streaming.
 - **Metadata**: `/api/audio/metadata` provides source/processed durations for tempo-aware UI.
 - **SOLID/DIP**: `IAudioProcessor` and `IAudioStreamService` interfaces.
 - **Networking**: chunked HTTP streaming of MP3; real-time transports such as UDP/RTP are outside the scope of this demo.

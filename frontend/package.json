@@ -21,6 +21,8 @@
     "@angular/platform-browser": "^19.2.18",
     "@angular/platform-browser-dynamic": "^19.2.18",
     "@angular/router": "^19.2.18",
+    "@fontsource-variable/oxanium": "^5.2.5",
+    "@fontsource/barlow": "^5.2.5",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",
     "wavesurfer.js": "^7.12.1",

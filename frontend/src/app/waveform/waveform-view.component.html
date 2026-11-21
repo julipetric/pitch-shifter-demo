@@ -1,15 +1,35 @@
-<div class="waveform-shell">
-  <div class="waveform-container" #container></div>
-
-  @if (isLoading) {
-    <div class="waveform-overlay">
-      <div class="spinner" aria-hidden="true"></div>
-      <div class="overlay-text">Loading…</div>
-    </div>
-  } @else if (isAnalyzing) {
-    <div class="waveform-overlay waveform-overlay--subtle">
-      <div class="spinner spinner--small" aria-hidden="true"></div>
-      <div class="overlay-text">Analyzing…</div>
-    </div>
+<div
+  #lane
+  class="lane"
+  role="img"
+  [attr.aria-label]="ariaLabel()"
+  [attr.aria-busy]="state() === 'loading' ? 'true' : null"
+  [class.lane--ready]="ready()"
+  (click)="onClick($event)"
+>
+  <div #wave class="wave" [class.wave--visible]="ready()"></div>
+  @if (state() === 'loading') {
+    <div class="skeleton" aria-hidden="true"></div>
   }
+  <div class="shade" aria-hidden="true"></div>
+  <div #hover class="hover" aria-hidden="true">
+    <div #hoverLine class="hover-line"></div>
+    <div #hoverTime class="hover-time"></div>
+  </div>
 </div>
+
+@switch (state()) {
+  @case ('loading') {
+    <p class="status">
+      <span class="status-pill"><span class="spinner" aria-hidden="true"></span>{{ loadingLabel() }}</span>
+    </p>
+  }
+  @case ('error') {
+    <p class="status">Couldn’t load this waveform.</p>
+  }
+  @case ('ready') {
+    @if (analysing()) {
+      <p class="chip"><span class="chip-dot" aria-hidden="true"></span>Colouring by frequency…</p>
+    }
+  }
+}

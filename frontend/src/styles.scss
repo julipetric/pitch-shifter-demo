@@ -1,0 +1,362 @@
+// Global styles: design tokens, the Angular Material theme and element defaults.
+// Fonts are self-hosted through the @fontsource packages listed in angular.json.
+@use '@angular/material' as mat;
+
+:root {
+  color-scheme: dark;
+
+  // Surfaces: neutral graphite with a faint violet cast, quiet enough that the spectral
+  // colours below stay the only saturated hues on screen.
+  --c-bg: #0f0f15;
+  --c-surface: #15151d;
+  --c-surface-2: #1c1c26;
+  --c-surface-3: #262633;
+  --c-line: #2a2a38;
+  --c-line-strong: #3b3b4d;
+
+  // Text. Dim and faint keep at least 4.5:1 against --c-surface at body sizes.
+  --c-text: #f2f1f7;
+  --c-text-dim: #a9a8ba;
+  --c-text-faint: #8a899f;
+
+  // Spectral scale, low to high frequency. Colour encodes frequency everywhere in the app:
+  // lightness rises along the scale, so a higher pitch always reads as a brighter colour.
+  // Mirrors SPECTRAL_STOPS in app/visual/spectral-palette.ts, which colours the canvases.
+  --spectral-0: #6952db;
+  --spectral-1: #b446d3;
+  --spectral-2: #ef5395;
+  --spectral-3: #ff9044;
+  --spectral-4: #fce076;
+  --spectral-gradient: linear-gradient(
+    90deg,
+    var(--spectral-0),
+    var(--spectral-1),
+    var(--spectral-2),
+    var(--spectral-3),
+    var(--spectral-4)
+  );
+
+  // Connection state of the audio server.
+  --c-online: #6ee7b7;
+  --c-offline: #ff7a7a;
+
+  // Oxanium's figures share one advance width, so readouts and timecodes do not shift as
+  // digits change. Barlow needs `font-variant-numeric: tabular-nums` for the same effect.
+  --font-display: 'Oxanium Variable', 'Oxanium', ui-sans-serif, system-ui, sans-serif;
+  --font-text: 'Barlow', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  // Type scale: major third from a 15px base.
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.8125rem;
+  --fs-md: 0.9375rem;
+  --fs-lg: 1.1875rem;
+  --fs-xl: 1.5rem;
+  --fs-2xl: 1.875rem;
+  --fs-3xl: 2.375rem;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  // Radii grow with the size of the surface: controls, panels, the stage.
+  --radius-s: 6px;
+  --radius-m: 10px;
+  --radius-l: 16px;
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-fast: 120ms;
+  --dur-med: 240ms;
+  --dur-slow: 480ms;
+}
+
+html {
+  @include mat.theme(
+    (
+      color: (
+        theme-type: dark,
+        primary: mat.$violet-palette,
+        tertiary: mat.$orange-palette,
+      ),
+      typography: 'Barlow',
+      density: 0,
+    )
+  );
+}
+
+// Material components read these system tokens; they map onto the app palette so the slide
+// toggle and tooltips share the neutral chrome of the custom controls. `:root` outranks the
+// `html` rules that `mat.theme` emits, whatever their order in the output.
+:root {
+  --mat-sys-primary: var(--c-text);
+  --mat-sys-on-primary: var(--c-bg);
+  --mat-sys-primary-container: var(--c-surface-3);
+  --mat-sys-on-primary-container: var(--c-text);
+  --mat-sys-surface: var(--c-surface);
+  --mat-sys-on-surface: var(--c-text);
+  --mat-sys-on-surface-variant: var(--c-text-dim);
+  --mat-sys-surface-container-highest: var(--c-surface-3);
+  --mat-sys-outline: var(--c-line-strong);
+  --mat-sys-outline-variant: var(--c-line);
+  --mat-sys-inverse-surface: #2f2f3e;
+  --mat-sys-inverse-on-surface: var(--c-text);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--c-bg);
+  color: var(--c-text);
+  font-family: var(--font-text);
+  font-size: var(--fs-md);
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+a {
+  color: inherit;
+}
+
+::selection {
+  background: rgb(232 71 143 / 45%);
+}
+
+// Keyboard focus is a light outline that follows each control's radius.
+:focus-visible {
+  outline: 2px solid var(--c-text);
+  outline-offset: 3px;
+}
+
+// ---- Shared controls -------------------------------------------------------------------
+// Primitives of the design system, shared by the shell and the components inside it.
+
+.ghost-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 34px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: var(--c-text-dim);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out);
+
+  svg {
+    width: 18px;
+    height: 18px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  &:hover {
+    color: var(--c-text);
+    border-color: var(--c-line-strong);
+    background: var(--c-surface);
+  }
+}
+
+.icon-button {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--c-text-dim);
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
+
+  svg {
+    width: 22px;
+    height: 22px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .speaker {
+    fill: currentColor;
+  }
+
+  &:hover {
+    color: var(--c-text);
+    background: var(--c-surface-2);
+  }
+}
+
+.section-label {
+  font-family: var(--font-text);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  color: var(--c-text-dim);
+}
+
+// Native range inputs: a thin track filled up to `--fill` (0–1) and a small round thumb.
+.range {
+  --track-color: var(--c-line-strong);
+  --fill-color: var(--c-text);
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  height: 24px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+
+  &::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: 999px;
+    background: linear-gradient(
+      90deg,
+      var(--fill-color) calc(var(--fill, 0) * 100%),
+      var(--track-color) calc(var(--fill, 0) * 100%)
+    );
+  }
+
+  &::-moz-range-track {
+    height: 4px;
+    border-radius: 999px;
+    background: var(--track-color);
+  }
+
+  &::-moz-range-progress {
+    height: 4px;
+    border-radius: 999px;
+    background: var(--fill-color);
+  }
+
+  &::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    margin-top: -5px;
+    border: 2px solid var(--c-surface);
+    border-radius: 50%;
+    background: var(--c-text);
+    transition: transform var(--dur-fast) var(--ease-out);
+  }
+
+  &::-moz-range-thumb {
+    width: 10px;
+    height: 10px;
+    border: 2px solid var(--c-surface);
+    border-radius: 50%;
+    background: var(--c-text);
+    transition: transform var(--dur-fast) var(--ease-out);
+  }
+
+  &:hover:not(:disabled)::-webkit-slider-thumb,
+  &:active::-webkit-slider-thumb {
+    transform: scale(1.25);
+  }
+
+  &:hover:not(:disabled)::-moz-range-thumb,
+  &:active::-moz-range-thumb {
+    transform: scale(1.25);
+  }
+
+  &:focus-visible {
+    outline: none;
+  }
+
+  &:focus-visible::-webkit-slider-thumb {
+    box-shadow: 0 0 0 2px var(--c-surface), 0 0 0 4px var(--c-text);
+  }
+
+  &:focus-visible::-moz-range-thumb {
+    box-shadow: 0 0 0 2px var(--c-surface), 0 0 0 4px var(--c-text);
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.4;
+  }
+}
+
+kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 26px;
+  height: 24px;
+  padding: 0 6px;
+  border: 1px solid var(--c-line-strong);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: var(--c-surface-3);
+  color: var(--c-text);
+  font-family: var(--font-text);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+
+.mat-mdc-tooltip {
+  --mdc-plain-tooltip-supporting-text-size: var(--fs-sm);
+  --mdc-plain-tooltip-supporting-text-font: var(--font-text);
+  --mdc-plain-tooltip-container-shape: var(--radius-s);
+}
+
+// Hides content visually while keeping it available to assistive technology.
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

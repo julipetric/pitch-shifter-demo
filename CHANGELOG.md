@@ -5,6 +5,34 @@ All notable changes to this project are documented here.
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/). Entries are grouped by
 milestone and dated from the git history.
 
+## [2026-11-21] Frontend redesign
+
+### Added
+- A dark "audio console" design system: tokens in `frontend/src/styles.scss`, self-hosted Oxanium and Barlow fonts (`@fontsource-variable/oxanium`, `@fontsource/barlow`), and an Angular Material theme mapped onto the tokens.
+- `visual/spectral-palette.ts`: one logarithmic, OKLab-interpolated colour scale (50 Hz–10 kHz, violet to gold, lightness rising with frequency) for everything derived from audio.
+- `KnobComponent`: SVG rotary control for tempo and pitch with drag, wheel, WAI-ARIA slider keys, double-click and reset button; the pitch knob names the interval and shows the tape-style shift while pitch preservation is off.
+- Presets (Original, Slow motion, Practice, Chipmunk, Giant, Nightcore) with indicator lights, in `music/presets.ts`; interval names and readouts in `music/intervals.ts`.
+- `AudioAnalysisService`, `SpectrumAnalyzerComponent` (live 48-band spectrum that doubles as the colour legend) and `StageLightDirective` (a glow behind the stage tinted by the dominant frequency).
+- Click-to-seek and hover time on both waveforms; mute; keyboard shortcuts with an on-screen reference (`?`, `ShortcutsDialogComponent`); server status with a retry notice; buffering indicator on the play button.
+- `AudioApiService.buildDocsUrl()` for the footer's API reference link; SVG favicon and brand mark.
+- OpenSpec change `2026-11-20-frontend-redesign` and the updated `frontend-app`, `frontend-audio-transport` and `frontend-waveform-analyzer` specs.
+
+### Changed
+- The waveform views (`WaveformViewComponent`, formerly `WaveformSnippetComponent`) show the whole original and processed tracks, aligned by musical position, and no longer reload when the user seeks. Bars use the spectral scale; the playhead is driven per frame through the `--wf-progress` CSS custom property outside Angular's zone.
+- The page is a stage (track, live spectrum, waveforms, transport) and a deck (knobs, pitch mode, presets), side by side from 1180 px and stacked on narrower screens.
+- `WaveformFrequencyService` keeps the dominant-frequency analysis only: colour mapping lives in the palette module, and each view scales its bars from the peaks it draws.
+- Seek and volume are styled native range inputs; the play button, timecode and volume form a transport strip under the waveforms.
+- The `<audio>` element requests streams with `crossorigin="anonymous"`, required to route it through the Web Audio analyser.
+- Global styles are SCSS (`src/styles.scss`), including the shared control primitives; the per-component style budget is 8 kB (warning) / 16 kB (error).
+
+### Fixed
+- A second tempo change made at the same playback position (for example two changes before pressing Play) was dropped by the update debounce.
+- The waveform playhead no longer drifts from the audio after a seek into processed audio.
+
+### Removed
+- The prebuilt `azure-blue` Material theme and the Google Fonts links for Roboto and Material Icons.
+- `WaveformFrequencyService.getNormalizationPeak()` and the full-track scan behind it.
+
 ## [2026-11-12] Containers, tests, CI and documentation
 
 ### Added

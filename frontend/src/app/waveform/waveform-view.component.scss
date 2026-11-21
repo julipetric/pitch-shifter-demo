@@ -1,68 +1,256 @@
+// Fills the width of its host. The height comes from --wf-height and the playback position
+// from --wf-progress (0 to 1); the layout around the view sets both on the host or on any
+// ancestor.
 :host {
-  display: block;
-  width: 100%;
-}
-
-.waveform-shell {
   position: relative;
-  width: 100%;
-}
-
-.waveform-container {
   display: block;
-  min-height: 120px;
-  height: 120px;
-  width: 100%;
-  max-width: 100%;
   min-width: 0;
-  background: #0d0d0d;
-  border-radius: 4px;
-  overflow: hidden;
-  box-sizing: border-box;
+  height: var(--wf-height, clamp(72px, 15vh, 156px));
+  contain: layout paint;
 }
 
-.waveform-overlay {
+// A dark, slightly recessed panel with a faint measuring grid behind the bars.
+.lane {
+  --grid-line: color-mix(in srgb, var(--c-text) 4%, transparent);
+  --grid-centre: color-mix(in srgb, var(--c-text) 8%, transparent);
+
   position: absolute;
   inset: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  align-items: center;
-  justify-content: center;
-  background: rgba(13, 13, 13, 0.65);
-  color: rgba(255, 255, 255, 0.88);
-  border-radius: 4px;
+  overflow: hidden;
+  border-radius: var(--radius-m);
+  background: var(--c-bg);
+  box-shadow: inset 0 2px 8px rgb(0 0 0 / 0.35);
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+
+  // The centre line, and a vertical line at every tenth of the track.
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(
+        to bottom,
+        transparent calc(50% - 0.5px),
+        var(--grid-centre) 0 calc(50% + 0.5px),
+        transparent 0
+      ),
+      repeating-linear-gradient(to right, transparent 0 calc(10% - 1px), var(--grid-line) 0 10%);
+  }
+
+  // Hairline border, drawn above the bars and the shade.
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border: 1px solid var(--c-line);
+    border-radius: inherit;
+    pointer-events: none;
+  }
+}
+
+.lane--ready {
+  cursor: pointer;
+}
+
+// WaveSurfer draws into this layer; the bars fade in once the track is decoded. Its shadow DOM
+// stacks the canvases with z-index, so the layer isolates them: the shade, the playhead and the
+// hover line above it stay in front of the bars.
+.wave {
+  position: absolute;
+  inset: 0;
+  isolation: isolate;
+  opacity: 0;
+}
+
+.wave--visible {
+  opacity: 1;
+  transition: opacity var(--dur-med) var(--ease-out);
+}
+
+// Loading skeleton: thin bars cut to a soft, waveform-like envelope of overlapping ellipses,
+// with a slow shine travelling across. The shine lies inside the masks, so it lights the bars
+// and never the gaps between them.
+.skeleton {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--c-line-strong) 75%, transparent);
+  mask-image:
+    repeating-linear-gradient(to right, #000 0 2px, transparent 2px 5px),
+    radial-gradient(16% 34% at 7% 50%, #000 30%, transparent),
+    radial-gradient(15% 40% at 24% 50%, #000 30%, transparent),
+    radial-gradient(14% 30% at 40% 50%, #000 30%, transparent),
+    radial-gradient(17% 42% at 57% 50%, #000 30%, transparent),
+    radial-gradient(14% 32% at 75% 50%, #000 30%, transparent),
+    radial-gradient(16% 38% at 93% 50%, #000 30%, transparent);
+  mask-composite: intersect, add, add, add, add, add;
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    width: 40%;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in srgb, var(--c-text) 24%, transparent),
+      transparent
+    );
+    transform: translateX(-100%);
+    animation: shine 2.6s ease-in-out infinite;
+  }
+}
+
+@keyframes shine {
+  to {
+    transform: translateX(250%);
+  }
+}
+
+// Dims the part of the track not played yet; its left edge is the playhead. The parent writes
+// --wf-progress up to every frame, so the layer moves by transform alone, with no transition,
+// no layout and no repaint.
+.shade {
+  position: absolute;
+  inset: 0;
+  display: none;
+  background: color-mix(in srgb, var(--c-bg) 50%, transparent);
+  transform: translateX(calc(var(--wf-progress, 0) * 100%));
+  will-change: transform;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -1px;
+    width: 2px;
+    background: var(--c-text);
+    box-shadow:
+      0 0 6px color-mix(in srgb, var(--c-text) 55%, transparent),
+      0 0 16px color-mix(in srgb, var(--c-text) 20%, transparent);
+  }
+}
+
+.lane--ready .shade {
+  display: block;
+}
+
+// Hover line and time; the component places them on pointer moves.
+.hover {
+  position: absolute;
+  inset: 0;
+  visibility: hidden;
   pointer-events: none;
 }
 
-.waveform-overlay--subtle {
-  background: rgba(13, 13, 13, 0.35);
-  justify-content: flex-end;
-  padding-bottom: 0.75rem;
-  gap: 0.35rem;
+.lane--ready .hover--visible {
+  visibility: visible;
 }
 
-.overlay-text {
-  font-size: 0.9rem;
-  user-select: none;
+.hover-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 1px;
+  background: color-mix(in srgb, var(--c-text) 45%, transparent);
+}
+
+.hover-time {
+  position: absolute;
+  top: var(--space-1);
+  left: 0;
+  padding: 1px 6px;
+  border: 1px solid var(--c-line-strong);
+  border-radius: var(--radius-s);
+  background: color-mix(in srgb, var(--c-surface-2) 92%, transparent);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.4);
+  color: var(--c-text);
+  font-family: var(--font-display);
+  font-size: var(--fs-xs);
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+// Loading and error messages sit over the lane but outside its image role, so assistive
+// technology reads them.
+.status {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0 var(--space-4);
+  color: var(--c-text-dim);
+  font-size: var(--fs-sm);
+  text-align: center;
+  pointer-events: none;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--c-bg) 78%, transparent);
 }
 
 .spinner {
-  width: 26px;
-  height: 26px;
-  border-radius: 999px;
-  border: 3px solid rgba(255, 255, 255, 0.25);
-  border-top-color: rgba(255, 255, 255, 0.9);
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid color-mix(in srgb, var(--c-text-dim) 30%, transparent);
+  border-top-color: var(--c-text-dim);
+  border-radius: 50%;
   animation: spin 0.9s linear infinite;
 }
 
-.spinner--small {
-  width: 16px;
-  height: 16px;
-  border-width: 2px;
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+// Shown while the frequency analysis colours the bars.
+.chip {
+  position: absolute;
+  right: var(--space-2);
+  bottom: var(--space-2);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-s);
+  background: color-mix(in srgb, var(--c-bg) 82%, transparent);
+  color: var(--c-text-dim);
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+  pointer-events: none;
+}
+
+.chip-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--spectral-gradient);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after {
+    display: none;
+  }
+
+  .spinner {
+    animation: none;
+  }
+
+  .wave--visible {
+    transition: none;
+  }
 }
