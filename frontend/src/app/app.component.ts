@@ -7,7 +7,7 @@ import { MatSliderModule } from '@angular/material/slider';
 import { MatSlideToggleChange, MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { Subject } from 'rxjs';
 import { debounceTime, distinctUntilChanged, takeUntil } from 'rxjs/operators';
-import { WaveformSnippetComponent } from './waveform/waveform-snippet.component';
+import { WaveformSnippetComponent } from './waveform/waveform-view.component';
 import { AudioFacadeService } from './services/audio-facade.service';
 import { FormatTimePipe } from './pipes/format-time.pipe';
 
